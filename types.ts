@@ -97,7 +97,8 @@ export interface BrewLogEntry {
   date: string; // Original start date
   brewDate?: string;
   fermentationDate?: string;
-  status: 'brewing' | 'fermenting' | 'bottled';
+  lageringDate?: string;
+  status: 'brewing' | 'fermenting' | 'lagering' | 'bottled';
   notes: string;
   measurements: {
     actual_og?: number;

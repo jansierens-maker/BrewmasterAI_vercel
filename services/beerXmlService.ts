@@ -29,13 +29,57 @@ export const parseBeerXml = (xmlString: string): BeerXmlImportResult => {
     mashes: []
   };
 
-  const getVal = (el: Element, tag: string) => el.getElementsByTagName(tag)[0]?.textContent || "";
-  const getNum = (el: Element, tag: string) => parseFloat(el.getElementsByTagName(tag)[0]?.textContent || "0");
+  const getVal = (el: Element | null, tag: string) => el?.getElementsByTagName(tag)[0]?.textContent || "";
+  const getNum = (el: Element | null, tag: string) => parseFloat(el?.getElementsByTagName(tag)[0]?.textContent || "0");
 
-  // 1. Recepten
+  // 1. Recepten met diepgaande ingrediënt-parsing
   const recipes = xmlDoc.getElementsByTagName("RECIPE");
   for (let i = 0; i < recipes.length; i++) {
     const r = recipes[i];
+    
+    // Parse Fermentables in recipe
+    const recipeFermentables: Fermentable[] = [];
+    const fNodes = r.getElementsByTagName("FERMENTABLE");
+    for (let j = 0; j < fNodes.length; j++) {
+      const f = fNodes[j];
+      const pot = getNum(f, "POTENTIAL");
+      recipeFermentables.push({
+        name: getVal(f, "NAME"),
+        type: getVal(f, "TYPE").toLowerCase(),
+        amount: { unit: "kilograms", value: getNum(f, "AMOUNT") },
+        yield: { potential: { value: pot || 1.037 } },
+        color: { value: getNum(f, "COLOR") }
+      });
+    }
+
+    // Parse Hops in recipe
+    const recipeHops: Hop[] = [];
+    const hNodes = r.getElementsByTagName("HOP");
+    for (let j = 0; j < hNodes.length; j++) {
+      const h = hNodes[j];
+      // BeerXML is in KG, we use Grams internally
+      recipeHops.push({
+        name: getVal(h, "NAME"),
+        amount: { unit: "grams", value: getNum(h, "AMOUNT") * 1000 },
+        alpha_acid: { value: getNum(h, "ALPHA") },
+        use: (getVal(h, "USE").toLowerCase().replace(" ", "_") as any) || "boil",
+        time: { unit: "minutes", value: getNum(h, "TIME") }
+      });
+    }
+
+    // Parse Yeasts in recipe
+    const recipeCultures: Culture[] = [];
+    const yNodes = r.getElementsByTagName("YEAST");
+    for (let j = 0; j < yNodes.length; j++) {
+      const y = yNodes[j];
+      recipeCultures.push({
+        name: getVal(y, "NAME"),
+        type: (getVal(y, "TYPE").toLowerCase() as any) || "ale",
+        form: (getVal(y, "FORM").toLowerCase() as any) || "dry",
+        attenuation: getNum(y, "ATTENUATION") || 75
+      });
+    }
+
     result.recipes.push({
       id: Math.random().toString(36).substr(2, 9),
       name: getVal(r, "NAME"),
@@ -44,7 +88,11 @@ export const parseBeerXml = (xmlString: string): BeerXmlImportResult => {
       batch_size: { unit: "liters", value: getNum(r, "BATCH_SIZE") },
       efficiency: { brewhouse: getNum(r, "EFFICIENCY") },
       boil_time: { unit: "minutes", value: getNum(r, "BOIL_TIME") },
-      ingredients: { fermentables: [], hops: [], cultures: [] },
+      ingredients: { 
+        fermentables: recipeFermentables, 
+        hops: recipeHops, 
+        cultures: recipeCultures 
+      },
       specifications: {
         og: { value: getNum(r, "EST_OG") },
         fg: { value: getNum(r, "EST_FG") },
@@ -53,75 +101,45 @@ export const parseBeerXml = (xmlString: string): BeerXmlImportResult => {
         color: { value: getNum(r, "EST_COLOR") }
       }
     });
-    // In-recipe ingredients are usually handled by the app's linking logic, 
-    // but we can parse them here if needed for direct import.
   }
 
-  // 2. Hops
+  // 2. Losse ingrediënten voor de bibliotheek (indien aanwezig in XML root)
   const hops = xmlDoc.getElementsByTagName("HOP");
   for (let i = 0; i < hops.length; i++) {
     const h = hops[i];
-    if (h.parentElement?.tagName === "RECIPE") continue; // Skip in-recipe hops
-    result.hops.push({
-      name: getVal(h, "NAME"),
-      alpha: getNum(h, "ALPHA"),
-      type: "hop",
-      notes: getVal(h, "NOTES")
-    });
+    if (h.parentElement?.tagName === "HOPS" && h.parentElement?.parentElement?.tagName !== "RECIPE") {
+      result.hops.push({
+        name: getVal(h, "NAME"),
+        alpha: getNum(h, "ALPHA"),
+        type: "hop"
+      });
+    }
   }
 
-  // 3. Fermentables
   const grains = xmlDoc.getElementsByTagName("FERMENTABLE");
   for (let i = 0; i < grains.length; i++) {
     const g = grains[i];
-    if (g.parentElement?.tagName === "RECIPE") continue;
-    result.fermentables.push({
-      name: getVal(g, "NAME"),
-      yield: getNum(g, "YIELD"),
-      color: getNum(g, "COLOR"),
-      type: "fermentable"
-    });
+    if (g.parentElement?.tagName === "FERMENTABLES" && g.parentElement?.parentElement?.tagName !== "RECIPE") {
+      result.fermentables.push({
+        name: getVal(g, "NAME"),
+        yield: getNum(g, "YIELD"),
+        color: getNum(g, "COLOR"),
+        type: "fermentable"
+      });
+    }
   }
 
-  // 4. Yeasts
   const yeasts = xmlDoc.getElementsByTagName("YEAST");
   for (let i = 0; i < yeasts.length; i++) {
     const y = yeasts[i];
-    if (y.parentElement?.tagName === "RECIPE") continue;
-    result.cultures.push({
-      name: getVal(y, "NAME"),
-      attenuation: getNum(y, "ATTENUATION"),
-      form: getVal(y, "FORM").toLowerCase(),
-      type: "culture"
-    });
-  }
-
-  // 5. Misc
-  const miscs = xmlDoc.getElementsByTagName("MISC");
-  for (let i = 0; i < miscs.length; i++) {
-    const m = miscs[i];
-    result.miscs.push({ name: getVal(m, "NAME"), type: getVal(m, "TYPE"), use: getVal(m, "USE") });
-  }
-
-  // 6. Water
-  const waters = xmlDoc.getElementsByTagName("WATER");
-  for (let i = 0; i < waters.length; i++) {
-    const w = waters[i];
-    result.waters.push({ 
-      name: getVal(w, "NAME"), 
-      calcium: getNum(w, "CALCIUM"),
-      magnesium: getNum(w, "MAGNESIUM"),
-      sodium: getNum(w, "SODIUM"),
-      sulfate: getNum(w, "SULFATE"),
-      chloride: getNum(w, "CHLORIDE"),
-      bicarbonate: getNum(w, "BICARBONATE")
-    });
-  }
-
-  // 7. Styles, Equipment, Mash (Stored as general library items or specific types)
-  const styles = xmlDoc.getElementsByTagName("STYLE");
-  for (let i = 0; i < styles.length; i++) {
-    result.styles.push({ name: getVal(styles[i], "NAME"), category: getVal(styles[i], "CATEGORY") });
+    if (y.parentElement?.tagName === "YEASTS" && y.parentElement?.parentElement?.tagName !== "RECIPE") {
+      result.cultures.push({
+        name: getVal(y, "NAME"),
+        attenuation: getNum(y, "ATTENUATION"),
+        form: getVal(y, "FORM").toLowerCase(),
+        type: "culture"
+      });
+    }
   }
 
   return result;

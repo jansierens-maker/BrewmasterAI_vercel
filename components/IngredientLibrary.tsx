@@ -1,12 +1,14 @@
 
 import React, { useState } from 'react';
 import { LibraryIngredient } from '../types';
+import { useTranslation } from '../App';
 
 interface LibraryProps {
   ingredients: LibraryIngredient[];
   onUpdate: (ingredients: LibraryIngredient[]) => void;
-  onBackupRestore?: (data: any) => void;
-  // BeerXML Import Props
+  onExport: () => void;
+  onExportBeerXml: () => void;
+  onRestore: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onFileImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onUrlImport: () => void;
   xmlUrl: string;
@@ -17,209 +19,275 @@ interface LibraryProps {
 const IngredientLibrary: React.FC<LibraryProps> = ({ 
   ingredients, 
   onUpdate, 
-  onBackupRestore,
-  onFileImport,
-  onUrlImport,
-  xmlUrl,
-  onXmlUrlChange,
-  importStatus
+  onExport, 
+  onExportBeerXml,
+  onRestore, 
+  onFileImport, 
+  onUrlImport, 
+  xmlUrl, 
+  onXmlUrlChange, 
+  importStatus 
 }) => {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<'fermentable' | 'hop' | 'culture' | 'import' | 'data'>('fermentable');
-  const [editing, setEditing] = useState<Partial<LibraryIngredient> | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<LibraryIngredient>>({});
 
-  const handleSave = () => {
-    if (!editing?.name) return;
-    const id = editing.id || Math.random().toString(36).substr(2, 9);
-    const newItem = { ...editing, id, type: filter } as LibraryIngredient;
-    
-    if (editing.id) {
-      onUpdate(ingredients.map(i => i.id === editing.id ? newItem : i));
-    } else {
-      onUpdate([...ingredients, newItem]);
-    }
-    setEditing(null);
+  const handleAddNew = () => {
+    const newId = Math.random().toString(36).substr(2, 9);
+    const newItem: LibraryIngredient = {
+      id: newId,
+      name: t('new_btn') + ' ' + (filter === 'fermentable' ? t('malt') : filter === 'hop' ? t('hops') : t('yeast_lib')),
+      type: filter as string,
+      color: filter === 'fermentable' ? 2 : undefined,
+      yield: filter === 'fermentable' ? 75 : undefined,
+      alpha: filter === 'hop' ? 5 : undefined,
+      attenuation: filter === 'culture' ? 75 : undefined,
+      form: filter === 'culture' ? 'dry' : undefined
+    };
+    onUpdate([...ingredients, newItem]);
+    startEditing(newItem);
+  };
+
+  const startEditing = (item: LibraryIngredient) => {
+    setEditingId(item.id);
+    setEditForm(item);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditForm({});
+  };
+
+  const saveEditing = () => {
+    if (!editForm.name) return;
+    onUpdate(ingredients.map(i => i.id === editingId ? { ...i, ...editForm } as LibraryIngredient : i));
+    setEditingId(null);
+    setEditForm({});
   };
 
   const deleteItem = (id: string) => {
-    onUpdate(ingredients.filter(i => i.id !== id));
+    if (window.confirm(t('confirm_delete'))) {
+      onUpdate(ingredients.filter(i => i.id !== id));
+      setEditingId(null);
+      setEditForm({});
+    }
   };
-
-  const exportBackup = () => {
-    const data = localStorage.getItem('brewmaster_data_v3');
-    if (!data) return;
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `brewmaster_backup_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-  };
-
-  const importBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = JSON.parse(event.target?.result as string);
-        if (onBackupRestore) onBackupRestore(data);
-        alert('Backup succesvol hersteld!');
-      } catch (err) {
-        alert('Ongeldig backup bestand.');
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const filtered = ingredients.filter(i => i.type === filter);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-wrap gap-4 items-center bg-white p-4 rounded-3xl shadow-sm border border-stone-200">
-        <div className="flex flex-wrap gap-1">
-          <button onClick={() => setFilter('fermentable')} className={`px-4 py-2 rounded-xl font-bold transition-all text-xs ${filter === 'fermentable' ? 'bg-amber-600 text-white' : 'bg-stone-50 text-stone-400 hover:text-stone-600'}`}>Mout</button>
-          <button onClick={() => setFilter('hop')} className={`px-4 py-2 rounded-xl font-bold transition-all text-xs ${filter === 'hop' ? 'bg-green-600 text-white' : 'bg-stone-50 text-stone-400 hover:text-stone-600'}`}>Hop</button>
-          <button onClick={() => setFilter('culture')} className={`px-4 py-2 rounded-xl font-bold transition-all text-xs ${filter === 'culture' ? 'bg-blue-600 text-white' : 'bg-stone-50 text-stone-400 hover:text-stone-600'}`}>Gist</button>
-          <div className="w-px h-8 bg-stone-200 mx-2 hidden sm:block"></div>
-          <button onClick={() => setFilter('import')} className={`px-4 py-2 rounded-xl font-bold transition-all text-xs ${filter === 'import' ? 'bg-amber-100 text-amber-700' : 'bg-stone-50 text-stone-400 hover:text-stone-600'}`}>
-            <i className="fas fa-file-import mr-2"></i>BeerXML
-          </button>
-          <button onClick={() => setFilter('data')} className={`px-4 py-2 rounded-xl font-bold transition-all text-xs ${filter === 'data' ? 'bg-stone-800 text-white' : 'bg-stone-50 text-stone-400 hover:text-stone-600'}`}>
-            <i className="fas fa-database mr-2"></i>Backup
-          </button>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Menu Sections */}
+      <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between bg-white p-6 rounded-3xl shadow-sm border border-stone-200">
+        <div className="space-y-3 w-full md:w-auto">
+          <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest ml-1">{t('ingredients_header')}</p>
+          <div className="flex flex-wrap gap-1">
+            <button 
+              onClick={() => { setFilter('fermentable'); cancelEditing(); }} 
+              className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${filter === 'fermentable' ? 'bg-amber-600 text-white shadow-lg' : 'text-stone-400 hover:bg-stone-50'}`}
+            >
+              {t('malt')}
+            </button>
+            <button 
+              onClick={() => { setFilter('hop'); cancelEditing(); }} 
+              className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${filter === 'hop' ? 'bg-green-600 text-white shadow-lg' : 'text-stone-400 hover:bg-stone-50'}`}
+            >
+              {t('hops')}
+            </button>
+            <button 
+              onClick={() => { setFilter('culture'); cancelEditing(); }} 
+              className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${filter === 'culture' ? 'bg-blue-600 text-white shadow-lg' : 'text-stone-400 hover:bg-stone-50'}`}
+            >
+              {t('yeast_lib')}
+            </button>
+          </div>
         </div>
-        {['fermentable', 'hop', 'culture'].includes(filter) && (
-          <button onClick={() => setEditing({ type: filter })} className="ml-auto bg-stone-900 text-white px-5 py-2 rounded-xl font-bold hover:bg-black text-xs transition-all">
-            <i className="fas fa-plus mr-2"></i>Nieuw Item
-          </button>
-        )}
+
+        <div className="space-y-3 w-full md:w-auto border-t md:border-t-0 md:border-l border-stone-100 pt-4 md:pt-0 md:pl-6">
+          <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest ml-1">{t('tools_header')}</p>
+          <div className="flex flex-wrap gap-1">
+            <button 
+              onClick={() => { setFilter('import'); cancelEditing(); }} 
+              className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${filter === 'import' ? 'bg-stone-900 text-white shadow-lg' : 'text-stone-400 hover:bg-stone-50'}`}
+            >
+              {t('import_tab')}
+            </button>
+            <button 
+              onClick={() => { setFilter('data'); cancelEditing(); }} 
+              className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${filter === 'data' ? 'bg-stone-800 text-white shadow-lg' : 'text-stone-400 hover:bg-stone-50'}`}
+            >
+              {t('backup_tab')}
+            </button>
+          </div>
+        </div>
       </div>
 
-      {filter === 'import' && (
-        <div className="bg-white p-10 rounded-3xl border border-stone-200 shadow-sm space-y-10 animate-in slide-in-from-bottom-2">
-          <div className="max-w-3xl mx-auto text-center space-y-4">
-            <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <i className="fas fa-file-code text-amber-600 text-2xl"></i>
+      {/* Category Header */}
+      {['fermentable', 'hop', 'culture'].includes(filter) && (
+        <div className="flex justify-between items-end px-2">
+          <div>
+            <h3 className="text-2xl font-black capitalize text-stone-900">{filter === 'fermentable' ? t('malt') : filter === 'hop' ? t('hops') : t('yeast_lib')}</h3>
+            <p className="text-stone-400 text-xs font-bold">{ingredients.filter(i => i.type === filter).length} {t('items_in_collection')}</p>
+          </div>
+          <button 
+            onClick={handleAddNew}
+            className="bg-stone-900 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow-lg hover:bg-black transition-all flex items-center gap-2"
+          >
+            <i className="fas fa-plus"></i> {t('new_btn')}
+          </button>
+        </div>
+      )}
+
+      {/* Grid Display */}
+      {['fermentable', 'hop', 'culture'].includes(filter) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {ingredients.filter(i => i.type === filter).length === 0 ? (
+            <div className="col-span-full py-20 text-center text-stone-300 font-medium bg-white rounded-3xl border-2 border-dashed border-stone-100">
+              {t('no_brews')}
             </div>
-            <h3 className="text-2xl font-black">BeerXML Importeer Tool</h3>
-            <p className="text-stone-500 font-medium">Importeer recepten, hop, granen, gist en meer vanuit elke BeerXML bron.</p>
+          ) : (
+            ingredients.filter(i => i.type === filter).map(item => (
+              <div key={item.id} className={`bg-white p-8 rounded-3xl border shadow-sm relative transition-all ${editingId === item.id ? 'border-amber-400 ring-2 ring-amber-100' : 'border-stone-200'}`}>
+                {editingId === item.id ? (
+                  <div className="space-y-4 animate-in zoom-in-95 duration-200">
+                    <div>
+                      <label className="text-[10px] font-black text-stone-400 uppercase">{t('name_label')}</label>
+                      <input className="w-full p-2 bg-stone-50 border rounded-lg text-sm font-bold" value={editForm.name || ""} onChange={e => setEditForm({...editForm, name: e.target.value})} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {filter === 'fermentable' && (
+                        <>
+                          <div>
+                            <label className="text-[10px] font-black text-stone-400 uppercase">{t('color')} (SRM)</label>
+                            <input type="number" step="0.1" className="w-full p-2 bg-stone-50 border rounded-lg text-sm font-bold" value={editForm.color || 0} onChange={e => setEditForm({...editForm, color: parseFloat(e.target.value) || 0})} />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-black text-stone-400 uppercase">{t('efficiency')} (%)</label>
+                            <input type="number" className="w-full p-2 bg-stone-50 border rounded-lg text-sm font-bold" value={editForm.yield || 0} onChange={e => setEditForm({...editForm, yield: parseFloat(e.target.value) || 0})} />
+                          </div>
+                        </>
+                      )}
+                      {filter === 'hop' && (
+                        <div>
+                          <label className="text-[10px] font-black text-stone-400 uppercase">{t('alpha_label')} (%)</label>
+                          <input type="number" step="0.1" className="w-full p-2 bg-stone-50 border rounded-lg text-sm font-bold" value={editForm.alpha || 0} onChange={e => setEditForm({...editForm, alpha: parseFloat(e.target.value) || 0})} />
+                        </div>
+                      )}
+                      {filter === 'culture' && (
+                        <>
+                          <div>
+                            <label className="text-[10px] font-black text-stone-400 uppercase">{t('attenuation_label')} (%)</label>
+                            <input type="number" className="w-full p-2 bg-stone-50 border rounded-lg text-sm font-bold" value={editForm.attenuation || 0} onChange={e => setEditForm({...editForm, attenuation: parseFloat(e.target.value) || 0})} />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-black text-stone-400 uppercase">{t('form_label')}</label>
+                            <select className="w-full p-2 bg-stone-50 border rounded-lg text-xs font-bold" value={editForm.form || "dry"} onChange={e => setEditForm({...editForm, form: e.target.value as any})}>
+                              <option value="dry">Dry</option>
+                              <option value="liquid">Liquid</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2 pt-2">
+                      <div className="flex gap-2">
+                        <button onClick={saveEditing} className="flex-1 bg-amber-600 text-white py-2.5 rounded-xl text-xs font-bold hover:bg-amber-700">{t('save_btn')}</button>
+                        <button onClick={cancelEditing} className="px-4 bg-stone-100 text-stone-400 py-2.5 rounded-xl text-xs font-bold hover:bg-stone-200">{t('cancel_btn')}</button>
+                      </div>
+                      <button onClick={() => deleteItem(item.id)} className="w-full mt-2 py-2 text-red-500 text-[10px] font-black uppercase hover:bg-red-50 rounded-xl transition-all">
+                        <i className="fas fa-trash-alt mr-2"></i> {t('delete_btn')} {t('nav_library').toLowerCase()}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-start mb-4">
+                      <h4 className="font-black text-lg text-stone-900 leading-tight">{item.name}</h4>
+                      <button onClick={() => startEditing(item)} className="text-stone-300 hover:text-amber-500 transition-colors">
+                        <i className="fas fa-edit text-xs"></i>
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-[10px] font-black uppercase tracking-widest text-stone-400">
+                      {item.type === 'fermentable' && (
+                        <>
+                          <div>{t('color')}: <span className="text-stone-900">{item.color} SRM</span></div>
+                          <div>{t('efficiency')}: <span className="text-stone-900">{item.yield}%</span></div>
+                        </>
+                      )}
+                      {item.type === 'hop' && (
+                        <div>Alpha: <span className="text-stone-900">{item.alpha}%</span></div>
+                      )}
+                      {item.type === 'culture' && (
+                        <>
+                          <div>Atten: <span className="text-stone-900">{item.attenuation}%</span></div>
+                          <div>{t('form_label')}: <span className="text-stone-900">{item.form}</span></div>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Tools Section */}
+      {filter === 'import' && (
+        <div className="bg-white p-10 md:p-16 rounded-3xl border border-stone-200 shadow-sm space-y-12 animate-in zoom-in-95 duration-300 text-center">
+          <div className="space-y-4">
+            <h3 className="text-3xl font-black text-stone-900">{t('import_tool')}</h3>
+            <p className="text-stone-500 font-medium max-w-xl mx-auto">{t('import_desc')}</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <div className="space-y-3">
-              <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest text-center">Via Bestand</p>
-              <label className="flex flex-col items-center justify-center w-full h-40 bg-stone-50 border-2 border-dashed border-stone-200 rounded-3xl cursor-pointer hover:bg-stone-100 group transition-all">
-                <i className="fas fa-cloud-upload-alt text-3xl text-stone-300 group-hover:text-amber-500 mb-3 transition-colors"></i>
-                <span className="text-sm font-bold text-stone-600 group-hover:text-amber-600">Sleep hierheen of klik</span>
-                <span className="text-[10px] text-stone-400 mt-1">.xml of .beerxml</span>
-                <input type="file" className="hidden" accept=".xml,.beerxml" onChange={onFileImport} />
-              </label>
-            </div>
-            <div className="space-y-3">
-              <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest text-center">Via URL</p>
-              <div className="h-40 bg-stone-50 border border-stone-100 rounded-3xl p-6 flex flex-col justify-center gap-4">
-                <input 
-                  type="text" 
-                  placeholder="https://..." 
-                  className="w-full px-4 h-12 bg-white border border-stone-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500 transition-all" 
-                  value={xmlUrl} 
-                  onChange={(e) => onXmlUrlChange(e.target.value)} 
-                />
-                <button 
-                  onClick={onUrlImport} 
-                  disabled={importStatus !== 'idle' || !xmlUrl} 
-                  className="w-full h-12 bg-stone-900 text-white rounded-xl font-bold text-sm hover:bg-black disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-                >
-                  <i className="fas fa-link"></i> Link Importeren
+          {/* Export Section for BeerXML */}
+          <div className="max-w-5xl mx-auto p-8 bg-amber-50 rounded-3xl border border-amber-100 space-y-4">
+             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="text-left">
+                  <h4 className="text-lg font-black text-amber-900">BeerXML Export</h4>
+                  <p className="text-xs text-amber-700 font-medium">Download your entire ingredient library as a BeerXML file.</p>
+                </div>
+                <button onClick={onExportBeerXml} className="bg-amber-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg hover:bg-amber-700 transition-all flex items-center gap-3">
+                  <i className="fas fa-file-export"></i> {t('export_library_xml')}
                 </button>
-              </div>
-            </div>
+             </div>
           </div>
-          <p className="text-center text-[10px] text-stone-400 font-medium italic">Let op: Recepten die via deze weg worden geïmporteerd verschijnen automatisch in je Recepten overzicht.</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+             <div className="space-y-4">
+               <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest">{t('via_file')}</p>
+               <label className="group flex flex-col items-center justify-center w-full h-56 bg-stone-50 border-2 border-dashed border-stone-200 rounded-3xl cursor-pointer hover:bg-stone-100 transition-all">
+                 <i className="fas fa-cloud-upload-alt text-4xl text-stone-300 group-hover:text-amber-500 mb-4"></i>
+                 <p className="text-sm text-stone-500 font-bold">{t('dropzone_text')}</p>
+                 <input type="file" className="hidden" accept=".xml,.beerxml" onChange={onFileImport} />
+               </label>
+             </div>
+             <div className="space-y-4">
+               <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest">{t('via_url')}</p>
+               <div className="h-56 bg-stone-50 border border-stone-100 rounded-3xl p-8 flex flex-col justify-center gap-5">
+                 <input type="text" placeholder="https://..." className="w-full px-4 h-14 bg-white border border-stone-200 rounded-xl text-sm font-medium" value={xmlUrl} onChange={(e) => onXmlUrlChange(e.target.value)} />
+                 <button onClick={onUrlImport} disabled={!xmlUrl} className="w-full h-14 bg-stone-900 text-white rounded-xl font-bold text-sm shadow-md disabled:opacity-50">Import From URL</button>
+               </div>
+             </div>
+          </div>
         </div>
       )}
 
       {filter === 'data' && (
-        <div className="bg-white p-10 rounded-3xl border border-stone-200 shadow-sm text-center space-y-8 animate-in slide-in-from-bottom-2">
-          <div>
-            <h3 className="text-2xl font-black mb-2">JSON Backups</h3>
-            <p className="text-stone-500">Exporteer je volledige database (recepten, logs, notes) naar een enkel bestand.</p>
-          </div>
+        <div className="bg-white p-12 md:p-20 rounded-3xl border border-stone-200 shadow-sm text-center space-y-10 animate-in zoom-in-95 duration-300">
+          <h3 className="text-3xl font-black text-stone-900">{t('backup_title')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-            <div className="p-6 bg-stone-50 rounded-2xl border border-stone-100 text-left hover:shadow-md transition-all">
-              <h4 className="font-bold mb-4 flex items-center gap-2"><i className="fas fa-download text-amber-600"></i> Export</h4>
-              <p className="text-xs text-stone-500 mb-6">Sla al je brouwsels en instellingen veilig op buiten de browser.</p>
-              <button onClick={exportBackup} className="w-full bg-stone-900 text-white py-3 rounded-xl font-bold hover:bg-black transition-all">Sla op als JSON</button>
+            <div className="p-8 bg-stone-50 rounded-3xl border border-stone-100 space-y-4">
+              <h4 className="font-bold text-stone-900">{t('export')} (Full JSON)</h4>
+              <p className="text-xs text-stone-500">Backs up all data: recipes, logs, and library.</p>
+              <button onClick={onExport} className="w-full bg-stone-900 text-white py-4 rounded-xl font-bold hover:bg-black transition-all shadow-lg">{t('export')}</button>
             </div>
-            <div className="p-6 bg-stone-50 rounded-2xl border border-stone-100 text-left hover:shadow-md transition-all">
-              <h4 className="font-bold mb-4 flex items-center gap-2"><i className="fas fa-upload text-blue-600"></i> Restore</h4>
-              <p className="text-xs text-stone-500 mb-6">Herstel een eerder gemaakte backup van je BrewMaster database.</p>
-              <label className="block w-full bg-white border border-stone-200 text-stone-900 py-3 rounded-xl font-bold text-center cursor-pointer hover:bg-stone-50 transition-all">
-                Bestand Kiezen
-                <input type="file" className="hidden" accept=".json" onChange={importBackup} />
+            <div className="p-8 bg-stone-50 rounded-3xl border border-stone-100 space-y-4">
+              <h4 className="font-bold text-stone-900">{t('restore')} (JSON)</h4>
+              <p className="text-xs text-stone-500">Restore from a previously exported JSON backup.</p>
+              <label className="block w-full bg-white border border-stone-200 text-stone-900 py-4 rounded-xl font-bold cursor-pointer hover:bg-stone-100 transition-all shadow-sm">
+                {t('restore')}
+                <input type="file" className="hidden" accept=".json" onChange={onRestore} />
               </label>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {['fermentable', 'hop', 'culture'].includes(filter) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in">
-          {filtered.length === 0 ? (
-            <div className="col-span-full py-16 text-center text-stone-400">
-              <i className="fas fa-box-open text-4xl mb-4 opacity-20"></i>
-              <p className="font-bold">Geen items in deze categorie.</p>
-            </div>
-          ) : filtered.map(item => (
-            <div key={item.id} className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm relative group hover:shadow-lg transition-all border-l-4" style={{ borderLeftColor: item.type === 'fermentable' ? '#D97706' : item.type === 'hop' ? '#16A34A' : '#2563EB' }}>
-              <div className="flex justify-between items-start mb-2">
-                <h4 className="font-bold text-stone-900 group-hover:text-amber-800 transition-colors">{item.name}</h4>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => setEditing(item)} className="w-8 h-8 flex items-center justify-center bg-stone-50 rounded-lg text-stone-400 hover:text-stone-900 hover:bg-stone-100"><i className="fas fa-edit text-xs"></i></button>
-                  <button onClick={() => deleteItem(item.id)} className="w-8 h-8 flex items-center justify-center bg-red-50 rounded-lg text-red-300 hover:text-red-600 hover:bg-red-100"><i className="fas fa-trash text-xs"></i></button>
-                </div>
-              </div>
-              <div className="text-xs font-medium text-stone-500 space-y-1">
-                {item.type === 'fermentable' && <p>Kleur: <span className="text-stone-900 font-bold">{item.color} SRM</span> | Rendement: <span className="text-stone-900 font-bold">{item.yield}%</span></p>}
-                {item.type === 'hop' && <p>Alfazuur: <span className="text-stone-900 font-bold">{item.alpha}%</span></p>}
-                {item.type === 'culture' && <p>Vergistingsgr: <span className="text-stone-900 font-bold">{item.attenuation}%</span> | Vorm: <span className="text-stone-900 font-bold">{item.form}</span></p>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {editing && (
-        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl animate-in zoom-in-95 duration-200">
-            <h3 className="text-2xl font-black mb-6">Item Aanpassen</h3>
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Naam</label>
-                <input className="w-full p-4 bg-stone-50 border rounded-2xl text-stone-900 font-bold outline-none focus:ring-2 focus:ring-amber-500" value={editing.name || ''} onChange={e => setEditing({...editing, name: e.target.value})} />
-              </div>
-              
-              {filter === 'fermentable' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1"><label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Kleur (SRM)</label><input type="number" className="w-full p-4 bg-stone-50 border rounded-2xl font-bold" value={editing.color || ''} onChange={e => setEditing({...editing, color: parseFloat(e.target.value)})} /></div>
-                  <div className="space-y-1"><label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Rendement (%)</label><input type="number" className="w-full p-4 bg-stone-50 border rounded-2xl font-bold" value={editing.yield || ''} onChange={e => setEditing({...editing, yield: parseFloat(e.target.value)})} /></div>
-                </div>
-              )}
-
-              {filter === 'hop' && (
-                <div className="space-y-1"><label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Alfazuur (%)</label><input type="number" step="0.1" className="w-full p-4 bg-stone-50 border rounded-2xl font-bold" value={editing.alpha || ''} onChange={e => setEditing({...editing, alpha: parseFloat(e.target.value)})} /></div>
-              )}
-
-              {filter === 'culture' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1"><label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Vergisting (%)</label><input type="number" className="w-full p-4 bg-stone-50 border rounded-2xl font-bold" value={editing.attenuation || 75} onChange={e => setEditing({...editing, attenuation: parseFloat(e.target.value)})} /></div>
-                  <div className="space-y-1"><label className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Vorm</label><select className="w-full p-4 bg-stone-50 border rounded-2xl font-bold" value={editing.form || 'dry'} onChange={e => setEditing({...editing, form: e.target.value as any})}><option value="dry">Dry</option><option value="liquid">Liquid</option></select></div>
-                </div>
-              )}
-            </div>
-            <div className="flex gap-3 mt-8">
-              <button onClick={() => setEditing(null)} className="flex-1 py-4 font-bold text-stone-400 hover:text-stone-600 transition-colors">Annuleren</button>
-              <button onClick={handleSave} className="flex-1 py-4 bg-stone-900 text-white rounded-2xl font-bold hover:bg-black transition-all">Opslaan</button>
             </div>
           </div>
         </div>
