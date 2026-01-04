@@ -20,6 +20,7 @@ export interface Recipe {
   name: string;
   type: 'extract' | 'partial_mash' | 'all_grain';
   author: string;
+  notes?: string;
   batch_size: {
     unit: 'liters' | 'gallons';
     value: number;

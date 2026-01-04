@@ -85,6 +85,7 @@ export const parseBeerXml = (xmlString: string): BeerXmlImportResult => {
       name: getVal(r, "NAME"),
       type: (getVal(r, "TYPE").toLowerCase().replace(" ", "_") as any) || "all_grain",
       author: getVal(r, "BREWER"),
+      notes: getVal(r, "NOTES"),
       batch_size: { unit: "liters", value: getNum(r, "BATCH_SIZE") },
       efficiency: { brewhouse: getNum(r, "EFFICIENCY") },
       boil_time: { unit: "minutes", value: getNum(r, "BOIL_TIME") },

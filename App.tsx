@@ -53,6 +53,28 @@ const App: React.FC = () => {
 
   const [printData, setPrintData] = useState<{ recipe?: Recipe, log?: BrewLogEntry, tastingNote?: TastingNote } | null>(null);
 
+  // Print Effect: Listen for data and trigger print, then cleanup
+  useEffect(() => {
+    if (printData) {
+      const handleAfterPrint = () => {
+        setPrintData(null);
+        window.removeEventListener('afterprint', handleAfterPrint);
+      };
+
+      window.addEventListener('afterprint', handleAfterPrint);
+
+      // Wait a frame to ensure PrintView is rendered in DOM
+      const timer = setTimeout(() => {
+        window.print();
+      }, 300);
+
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('afterprint', handleAfterPrint);
+      };
+    }
+  }, [printData]);
+
   useEffect(() => {
     localStorage.setItem('brew_lang', lang);
   }, [lang]);
@@ -143,9 +165,6 @@ const App: React.FC = () => {
 
   const handlePrintRecipe = (recipe: Recipe) => {
     setPrintData({ recipe });
-    setTimeout(() => {
-      window.print();
-    }, 100);
   };
 
   const handlePrintBrewReport = (log: BrewLogEntry) => {
@@ -153,9 +172,6 @@ const App: React.FC = () => {
     const tastingNote = tastingNotes.find(n => n.brewLogId === log.id);
     if (recipe) {
       setPrintData({ recipe, log, tastingNote });
-      setTimeout(() => {
-        window.print();
-      }, 100);
     }
   };
 
@@ -364,10 +380,14 @@ const App: React.FC = () => {
 
   return (
     <LanguageContext.Provider value={{ lang, setLang, t }}>
-      <div className="min-h-screen pb-20 bg-stone-50 text-stone-900 print:bg-white print:p-0">
+      <div className="min-h-screen bg-stone-50 text-stone-900 print:bg-white print:p-0">
         
         {/* PRINT VIEW (ONLY VISIBLE ON PRINT) */}
-        {printData && <PrintView recipe={printData.recipe} log={printData.log} tastingNote={printData.tastingNote} />}
+        {printData && (
+          <div className="absolute inset-0 z-[300] bg-white pointer-events-none print:pointer-events-auto">
+            <PrintView recipe={printData.recipe} log={printData.log} tastingNote={printData.tastingNote} />
+          </div>
+        )}
 
         <div className="print:hidden">
           {/* GLOBAL IMPORT OVERLAY */}
@@ -435,7 +455,7 @@ const App: React.FC = () => {
             </div>
           </header>
 
-          <main className="max-w-7xl mx-auto px-4 py-10">
+          <main className="max-w-7xl mx-auto px-4 py-10 pb-32">
             {view === 'recipes' && (
               <div className="space-y-10 animate-in fade-in duration-500">
                 <div>

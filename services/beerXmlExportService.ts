@@ -20,6 +20,10 @@ export const exportToBeerXml = (recipe: Recipe): string => {
   xmlParts.push(`    <BOIL_TIME>${recipe.boil_time.value}</BOIL_TIME>`);
   xmlParts.push(`    <EFFICIENCY>${recipe.efficiency.brewhouse}</EFFICIENCY>`);
   
+  if (recipe.notes) {
+    xmlParts.push(`    <NOTES>${sanitize(recipe.notes)}</NOTES>`);
+  }
+
   // Export calculated specifications so they can be re-imported
   if (recipe.specifications) {
     if (recipe.specifications.og) xmlParts.push(`    <EST_OG>${recipe.specifications.og.value}</EST_OG>`);

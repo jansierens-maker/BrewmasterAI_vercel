@@ -18,6 +18,7 @@ const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, onDelete, initial
     name: '',
     type: 'all_grain',
     author: '',
+    notes: '',
     batch_size: { unit: 'liters', value: 20 },
     ingredients: {
       fermentables: [],
@@ -261,6 +262,17 @@ const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, onDelete, initial
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Recipe Notes */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-stone-400 uppercase">{t('notes')}</label>
+          <textarea 
+            className="w-full p-4 bg-stone-50 border rounded-2xl min-h-[120px] font-medium" 
+            placeholder="Recipe description, mash schedule, or specific brewing tips..." 
+            value={recipe.notes || ''} 
+            onChange={e => setRecipe({...recipe, notes: e.target.value})} 
+          />
         </div>
 
         <div className="space-y-4">

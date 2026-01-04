@@ -19,7 +19,8 @@ export class GeminiService {
       2. For fermentables, include 'yield' with 'potential' value (e.g., 1.037).
       3. For cultures, include 'attenuation' percentage (e.g., 75).
       4. Ensure all ingredients have names that describe them well (e.g. 'Pilsner Malt', 'Citra Hops').
-      5. The output must be strictly valid JSON matching the provided schema.`,
+      5. Include a brief description of the beer style and any specific brewing tips in the 'notes' field.
+      6. The output must be strictly valid JSON matching the provided schema.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -28,6 +29,7 @@ export class GeminiService {
             name: { type: Type.STRING },
             type: { type: Type.STRING, enum: ["extract", "partial_mash", "all_grain"] },
             author: { type: Type.STRING },
+            notes: { type: Type.STRING },
             batch_size: {
               type: Type.OBJECT,
               properties: {
