@@ -7,11 +7,12 @@ import { useTranslation } from '../App';
 
 interface RecipeCreatorProps {
   onSave: (recipe: Recipe) => void;
+  onDelete?: (id: string) => void;
   initialRecipe?: Recipe;
   library: LibraryIngredient[];
 }
 
-const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, initialRecipe, library }) => {
+const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, onDelete, initialRecipe, library }) => {
   const { t } = useTranslation();
   const [recipe, setRecipe] = useState<Recipe>(initialRecipe || {
     name: '',
@@ -29,6 +30,7 @@ const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, initialRecipe, li
 
   const [aiPrompt, setAiPrompt] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const gemini = new GeminiService();
 
   const stats = useMemo(() => calculateRecipeStats(recipe), [recipe]);
@@ -43,6 +45,13 @@ const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, initialRecipe, li
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const confirmDelete = () => {
+    if (initialRecipe?.id && onDelete) {
+      onDelete(initialRecipe.id);
+      setIsDeleting(false);
     }
   };
 
@@ -139,6 +148,35 @@ const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, initialRecipe, li
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {/* CUSTOM DELETE CONFIRMATION MODAL */}
+      {isDeleting && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-300 text-center">
+            <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <i className="fas fa-trash-alt text-2xl text-red-600"></i>
+            </div>
+            <h3 className="text-2xl font-black text-stone-900 mb-2">{t('delete_btn')} {t('nav_recipes')}?</h3>
+            <p className="text-stone-500 font-medium mb-8">
+              {t('confirm_delete')}
+            </p>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setIsDeleting(false)} 
+                className="flex-1 py-4 bg-stone-100 text-stone-600 rounded-2xl font-black text-sm hover:bg-stone-200 transition-all uppercase tracking-widest"
+              >
+                {t('cancel_btn')}
+              </button>
+              <button 
+                onClick={confirmDelete} 
+                className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-black text-sm hover:bg-red-700 transition-all shadow-lg shadow-red-100 uppercase tracking-widest"
+              >
+                {t('delete_btn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="bg-stone-900 text-white p-8 rounded-3xl shadow-xl grid grid-cols-2 lg:grid-cols-4 gap-8 sticky top-24 z-40 border border-stone-800">
         <div><p className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1">{t('target_abv')}</p><p className="text-4xl font-black text-amber-500">{stats.abv}%</p></div>
         <div><p className="text-[10px] font-black text-stone-500 uppercase tracking-widest mb-1">{t('target_ibu')}</p><p className="text-4xl font-black text-green-500">{stats.ibu}</p></div>
@@ -225,7 +263,18 @@ const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, initialRecipe, li
           </div>
         </div>
 
-        <button onClick={() => onSave({...recipe, specifications: { og: {value: stats.og}, fg: {value: stats.fg}, abv: {value: stats.abv}, ibu: {value: stats.ibu}, color: {value: stats.color}}})} className="w-full bg-stone-900 text-white py-5 rounded-3xl font-black shadow-xl shadow-stone-200 hover:bg-black transition-all uppercase tracking-widest text-lg">{t('save_recipe')}</button>
+        <div className="space-y-4">
+          <button onClick={() => onSave({...recipe, specifications: { og: {value: stats.og}, fg: {value: stats.fg}, abv: {value: stats.abv}, ibu: {value: stats.ibu}, color: {value: stats.color}}})} className="w-full bg-stone-900 text-white py-5 rounded-3xl font-black shadow-xl shadow-stone-200 hover:bg-black transition-all uppercase tracking-widest text-lg">{t('save_recipe')}</button>
+          
+          {initialRecipe && (
+            <button 
+              onClick={() => setIsDeleting(true)}
+              className="w-full bg-white text-red-600 border border-red-100 py-3 rounded-2xl font-black hover:bg-red-50 transition-all uppercase tracking-widest text-xs"
+            >
+              <i className="fas fa-trash-alt mr-2"></i> {t('delete_btn')} {t('nav_recipes').toLowerCase()}
+            </button>
+          )}
+        </div>
       </section>
 
       {/* AI Assistant */}

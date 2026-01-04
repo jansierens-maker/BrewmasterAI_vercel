@@ -32,6 +32,7 @@ const IngredientLibrary: React.FC<LibraryProps> = ({
   const [filter, setFilter] = useState<'fermentable' | 'hop' | 'culture' | 'import' | 'data'>('fermentable');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<LibraryIngredient>>({});
+  const [itemToDelete, setItemToDelete] = useState<LibraryIngredient | null>(null);
 
   const handleAddNew = () => {
     const newId = Math.random().toString(36).substr(2, 9);
@@ -66,16 +67,51 @@ const IngredientLibrary: React.FC<LibraryProps> = ({
     setEditForm({});
   };
 
-  const deleteItem = (id: string) => {
-    if (window.confirm(t('confirm_delete'))) {
-      onUpdate(ingredients.filter(i => i.id !== id));
+  const deleteItem = (item: LibraryIngredient) => {
+    setItemToDelete(item);
+  };
+
+  const confirmDelete = () => {
+    if (itemToDelete) {
+      onUpdate(ingredients.filter(i => i.id !== itemToDelete.id));
       setEditingId(null);
       setEditForm({});
+      setItemToDelete(null);
     }
   };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {/* CUSTOM DELETE CONFIRMATION MODAL */}
+      {itemToDelete && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-300 text-center">
+            <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <i className="fas fa-trash-alt text-2xl text-red-600"></i>
+            </div>
+            <h3 className="text-2xl font-black text-stone-900 mb-2">{t('delete_ingredient')}?</h3>
+            <p className="text-stone-500 font-medium mb-1 text-sm">"{itemToDelete.name}"</p>
+            <p className="text-stone-400 text-xs mb-8">
+              {t('confirm_delete')}
+            </p>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setItemToDelete(null)} 
+                className="flex-1 py-4 bg-stone-100 text-stone-600 rounded-2xl font-black text-sm hover:bg-stone-200 transition-all uppercase tracking-widest"
+              >
+                {t('cancel_btn')}
+              </button>
+              <button 
+                onClick={confirmDelete} 
+                className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-black text-sm hover:bg-red-700 transition-all shadow-lg shadow-red-100 uppercase tracking-widest"
+              >
+                {t('delete_btn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Menu Sections */}
       <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between bg-white p-6 rounded-3xl shadow-sm border border-stone-200">
         <div className="space-y-3 w-full md:w-auto">
@@ -193,8 +229,8 @@ const IngredientLibrary: React.FC<LibraryProps> = ({
                         <button onClick={saveEditing} className="flex-1 bg-amber-600 text-white py-2.5 rounded-xl text-xs font-bold hover:bg-amber-700">{t('save_btn')}</button>
                         <button onClick={cancelEditing} className="px-4 bg-stone-100 text-stone-400 py-2.5 rounded-xl text-xs font-bold hover:bg-stone-200">{t('cancel_btn')}</button>
                       </div>
-                      <button onClick={() => deleteItem(item.id)} className="w-full mt-2 py-2 text-red-500 text-[10px] font-black uppercase hover:bg-red-50 rounded-xl transition-all">
-                        <i className="fas fa-trash-alt mr-2"></i> {t('delete_btn')} {t('nav_library').toLowerCase()}
+                      <button onClick={() => deleteItem(item)} className="w-full mt-2 py-2 text-red-500 text-[10px] font-black uppercase hover:bg-red-50 rounded-xl transition-all">
+                        <i className="fas fa-trash-alt mr-2"></i> {t('delete_ingredient')}
                       </button>
                     </div>
                   </div>
@@ -265,7 +301,13 @@ const IngredientLibrary: React.FC<LibraryProps> = ({
                <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest">{t('via_url')}</p>
                <div className="h-56 bg-stone-50 border border-stone-100 rounded-3xl p-8 flex flex-col justify-center gap-5">
                  <input type="text" placeholder="https://..." className="w-full px-4 h-14 bg-white border border-stone-200 rounded-xl text-sm font-medium" value={xmlUrl} onChange={(e) => onXmlUrlChange(e.target.value)} />
-                 <button onClick={onUrlImport} disabled={!xmlUrl} className="w-full h-14 bg-stone-900 text-white rounded-xl font-bold text-sm shadow-md disabled:opacity-50">Import From URL</button>
+                 <button 
+                  onClick={() => onUrlImport()} 
+                  disabled={!xmlUrl} 
+                  className="w-full h-14 bg-stone-900 text-white rounded-xl font-bold text-sm shadow-md disabled:opacity-50"
+                 >
+                   Import From URL
+                 </button>
                </div>
              </div>
           </div>

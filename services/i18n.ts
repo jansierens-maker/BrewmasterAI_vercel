@@ -83,6 +83,7 @@ export const translations = {
     lagering_date: "Lagering Start Date",
     confirm_delete: "Are you sure you want to delete this?",
     delete_btn: "Delete",
+    delete_ingredient: "Delete Ingredient",
     save_btn: "Save",
     cancel_btn: "Cancel",
     edit_btn: "Edit",
@@ -95,7 +96,15 @@ export const translations = {
     items_in_collection: "items in collection",
     additions: "Additions & Schedule",
     actual_batch_values: "Batch Adjustments",
-    export_library_xml: "Export Library (BeerXML)"
+    export_library_xml: "Export Library (BeerXML)",
+    import_demo: "Import Demo Recipes",
+    demo_hint: "or try our demo collection:",
+    print_recipe: "Print Recipe",
+    print_report: "Print Brew Report",
+    brew_summary: "Brew Summary",
+    recipe_summary: "Recipe Summary",
+    measurements: "Measurements",
+    notes: "Notes"
   },
   nl: {
     nav_recipes: "Recepten",
@@ -178,6 +187,7 @@ export const translations = {
     lagering_date: "Startdatum Lagering",
     confirm_delete: "Weet je zeker dat je dit wilt verwijderen?",
     delete_btn: "Verwijderen",
+    delete_ingredient: "Verwijder ingrediënt",
     save_btn: "Opslaan",
     cancel_btn: "Annuleren",
     edit_btn: "Bewerken",
@@ -190,7 +200,15 @@ export const translations = {
     items_in_collection: "items in collectie",
     additions: "Toevoegingen & Schema",
     actual_batch_values: "Batch Aanpassingen",
-    export_library_xml: "Exporteer Bibliotheek (BeerXML)"
+    export_library_xml: "Exporteer Bibliotheek (BeerXML)",
+    import_demo: "Importeer Demo Recepten",
+    demo_hint: "of probeer onze demo collectie:",
+    print_recipe: "Recept afdrukken",
+    print_report: "Brouwverslag afdrukken",
+    brew_summary: "Brouw Samenvatting",
+    recipe_summary: "Recept Samenvatting",
+    measurements: "Metingen",
+    notes: "Nota's"
   },
   fr: {
     nav_recipes: "Recettes",
@@ -242,7 +260,7 @@ export const translations = {
     flavor: "Saveur",
     mouthfeel: "Corps",
     overall: "Impression générale",
-    analyze_ai: "Analyser avec BrewAI",
+    analyze_ai: "Analyser with BrewAI",
     cicerone_analysis: "Analyse Cicerone",
     import_tool: "Import & Export",
     via_file: "Par Fichier",
@@ -273,6 +291,7 @@ export const translations = {
     lagering_date: "Début de la Garde",
     confirm_delete: "Êtes-vous sûr de vouloir supprimer ?",
     delete_btn: "Supprimer",
+    delete_ingredient: "Supprimer l'ingrédient",
     save_btn: "Sauvegarder",
     cancel_btn: "Annuler",
     edit_btn: "Modifier",
@@ -285,6 +304,14 @@ export const translations = {
     items_in_collection: "articles dans la collection",
     additions: "Ajouts & Planning",
     actual_batch_values: "Ajustements du Brassin",
-    export_library_xml: "Exporter la Bibliothèque (BeerXML)"
+    export_library_xml: "Exporter la Bibliothèque (BeerXML)",
+    import_demo: "Importer des recettes démo",
+    demo_hint: "ou essayez notre collection démo :",
+    print_recipe: "Imprimer la recette",
+    print_report: "Imprimer le rapport",
+    brew_summary: "Résumé du brassage",
+    recipe_summary: "Résumé de la recette",
+    measurements: "Mesures",
+    notes: "Notes"
   }
 };

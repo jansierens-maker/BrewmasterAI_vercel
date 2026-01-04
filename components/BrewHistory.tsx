@@ -10,9 +10,10 @@ interface BrewHistoryProps {
   tastingNotes: TastingNote[];
   onEditLog: (logId: string) => void;
   onAddTasting: (logId: string) => void;
+  onPrintReport?: (log: BrewLogEntry) => void;
 }
 
-const BrewHistory: React.FC<BrewHistoryProps> = ({ logs, recipes, tastingNotes, onEditLog, onAddTasting }) => {
+const BrewHistory: React.FC<BrewHistoryProps> = ({ logs, recipes, tastingNotes, onEditLog, onAddTasting, onPrintReport }) => {
   const { t } = useTranslation();
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const sortedLogs = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -73,8 +74,9 @@ const BrewHistory: React.FC<BrewHistoryProps> = ({ logs, recipes, tastingNotes, 
                       {log.status === 'bottled' && <span className="text-[10px] font-bold text-stone-400 uppercase">{t('bottled_label')}: {log.bottling?.date || '-'}</span>}
                     </div>
                   </div>
-                  <div className="flex gap-3 w-full md:w-auto">
+                  <div className="flex flex-wrap gap-3 w-full md:w-auto">
                     <button onClick={() => onEditLog(log.id)} className="flex-1 md:flex-none px-6 py-3 bg-stone-900 text-white rounded-xl font-bold text-xs hover:bg-black uppercase">{log.status === 'bottled' ? 'View' : 'Update'}</button>
+                    {onPrintReport && <button onClick={() => onPrintReport(log)} className="flex-1 md:flex-none px-4 py-3 bg-stone-100 text-stone-600 rounded-xl font-bold text-xs hover:bg-stone-200 transition-all uppercase" title={t('print_report')}><i className="fas fa-print"></i></button>}
                     {log.status === 'bottled' && <button onClick={() => onAddTasting(log.id)} className="flex-1 md:flex-none px-6 py-3 bg-amber-500 text-white rounded-xl font-bold text-xs uppercase shadow-sm">Review</button>}
                   </div>
                 </div>

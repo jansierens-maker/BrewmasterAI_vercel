@@ -5,6 +5,7 @@ import BrewLog from './components/BrewLog';
 import TastingNotes from './components/TastingNotes';
 import IngredientLibrary from './components/IngredientLibrary';
 import BrewHistory from './components/BrewHistory';
+import PrintView from './components/PrintView';
 import { Recipe, BrewLogEntry, TastingNote, LibraryIngredient } from './types';
 import { getSRMColor } from './services/calculations';
 import { parseBeerXml, BeerXmlImportResult } from './services/beerXmlService';
@@ -50,6 +51,8 @@ const App: React.FC = () => {
   const [importQueue, setImportQueue] = useState<{ type: 'recipe' | 'library', data: any }[]>([]);
   const [currentDuplicate, setCurrentDuplicate] = useState<{ type: 'recipe' | 'library', data: any } | null>(null);
 
+  const [printData, setPrintData] = useState<{ recipe?: Recipe, log?: BrewLogEntry, tastingNote?: TastingNote } | null>(null);
+
   useEffect(() => {
     localStorage.setItem('brew_lang', lang);
   }, [lang]);
@@ -81,6 +84,12 @@ const App: React.FC = () => {
       const newRecipe = { ...recipe, id: Math.random().toString(36).substr(2, 9) };
       setRecipes(prev => [...prev, newRecipe]);
     }
+    setSelectedRecipe(null);
+    setView('recipes');
+  };
+
+  const handleDeleteRecipe = (id: string) => {
+    setRecipes(prev => prev.filter(r => r.id !== id));
     setSelectedRecipe(null);
     setView('recipes');
   };
@@ -132,6 +141,24 @@ const App: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handlePrintRecipe = (recipe: Recipe) => {
+    setPrintData({ recipe });
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
+  const handlePrintBrewReport = (log: BrewLogEntry) => {
+    const recipe = recipes.find(r => r.id === log.recipeId);
+    const tastingNote = tastingNotes.find(n => n.brewLogId === log.id);
+    if (recipe) {
+      setPrintData({ recipe, log, tastingNote });
+      setTimeout(() => {
+        window.print();
+      }, 100);
+    }
+  };
+
   const handleExportLibraryBeerXml = () => {
     const xml = exportLibraryToBeerXml(library);
     const blob = new Blob([xml], { type: 'text/xml' });
@@ -174,7 +201,7 @@ const App: React.FC = () => {
     result.cultures.forEach(c => queue.push({ type: 'library', data: c }));
     
     if (queue.length === 0) {
-      alert("No data found.");
+      alert("No data found in the XML.");
       setImportStatus('idle');
       return;
     }
@@ -305,177 +332,223 @@ const App: React.FC = () => {
     reader.readAsText(file);
   };
 
-  const handleUrlImport = async () => {
-    if (!xmlUrl) return;
+  const handleUrlImport = async (urlInput?: any) => {
+    // Determine the target URL. If called by an event, ignore the event object.
+    const targetUrl = typeof urlInput === 'string' ? urlInput : xmlUrl;
+    
+    if (!targetUrl) return;
     setImportStatus('fetching');
     try {
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(xmlUrl)}`;
+      // Using corsproxy.io as a more robust alternative to allorigins
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
       const response = await fetch(proxyUrl);
-      const data = await response.json();
-      if (data.contents) {
-        setImportStatus('parsing');
-        startImportFlow(parseBeerXml(data.contents));
-      }
-      setXmlUrl('');
+      if (!response.ok) throw new Error("Network response was not ok");
+      
+      const xmlText = await response.text();
+      if (!xmlText) throw new Error("Received empty content from URL");
+
+      setImportStatus('parsing');
+      startImportFlow(parseBeerXml(xmlText));
+      
+      if (targetUrl === xmlUrl) setXmlUrl('');
     } catch (err) {
-      alert("Import failed.");
+      console.error("Import failed:", err);
+      alert("Import failed. Please verify the URL and your connection.");
       setImportStatus('idle');
     }
   };
 
+  const handleImportDemoData = () => {
+    handleUrlImport('http://www.beerxml.com/recipes.xml');
+  };
+
   return (
     <LanguageContext.Provider value={{ lang, setLang, t }}>
-      <div className="min-h-screen pb-20 bg-stone-50 text-stone-900">
-        {/* GLOBAL IMPORT OVERLAY */}
-        {importStatus !== 'idle' && (
-          <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6">
-            <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-300">
-              {importStatus !== 'resolving' ? (
-                <div className="text-center space-y-4">
-                  <div className="relative w-16 h-16 mx-auto">
-                    <div className="absolute inset-0 border-4 border-stone-100 rounded-full"></div>
-                    <div className="absolute inset-0 border-4 border-amber-500 rounded-full border-t-transparent animate-spin"></div>
+      <div className="min-h-screen pb-20 bg-stone-50 text-stone-900 print:bg-white print:p-0">
+        
+        {/* PRINT VIEW (ONLY VISIBLE ON PRINT) */}
+        {printData && <PrintView recipe={printData.recipe} log={printData.log} tastingNote={printData.tastingNote} />}
+
+        <div className="print:hidden">
+          {/* GLOBAL IMPORT OVERLAY */}
+          {importStatus !== 'idle' && (
+            <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6">
+              <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-300">
+                {importStatus !== 'resolving' ? (
+                  <div className="text-center space-y-4">
+                    <div className="relative w-16 h-16 mx-auto">
+                      <div className="absolute inset-0 border-4 border-stone-100 rounded-full"></div>
+                      <div className="absolute inset-0 border-4 border-amber-500 rounded-full border-t-transparent animate-spin"></div>
+                    </div>
+                    <h3 className="text-xl font-bold">Processing...</h3>
+                    <p className="text-xs text-stone-400 font-bold uppercase tracking-widest">{importStatus}</p>
                   </div>
-                  <h3 className="text-xl font-bold">Processing...</h3>
-                </div>
-              ) : currentDuplicate ? (
-                <div className="space-y-6">
-                  <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex items-center gap-3">
-                    <i className="fas fa-exclamation-triangle text-amber-600 text-xl"></i>
-                    <div className="flex-1 overflow-hidden">
-                      <h4 className="font-bold text-amber-900 text-sm">Conflict</h4>
-                      <p className="text-[10px] text-amber-700 font-bold truncate">"{currentDuplicate.data.name}"</p>
+                ) : currentDuplicate ? (
+                  <div className="space-y-6">
+                    <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex items-center gap-3">
+                      <i className="fas fa-exclamation-triangle text-amber-600 text-xl"></i>
+                      <div className="flex-1 overflow-hidden">
+                        <h4 className="font-bold text-amber-900 text-sm">Conflict</h4>
+                        <p className="text-[10px] text-amber-700 font-bold truncate">"{currentDuplicate.data.name}"</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2">
+                      <button onClick={() => resolveConflict('overwrite')} className="w-full py-3 bg-stone-900 text-white rounded-xl font-bold text-sm">Overwrite</button>
+                      <button onClick={() => resolveConflict('copy')} className="w-full py-3 bg-white border border-stone-200 text-stone-900 rounded-xl font-bold text-sm">Copy</button>
+                      <button onClick={() => resolveConflict('skip')} className="w-full py-3 bg-white border border-stone-200 text-stone-400 rounded-xl font-bold text-sm">Skip</button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-2">
-                    <button onClick={() => resolveConflict('overwrite')} className="w-full py-3 bg-stone-900 text-white rounded-xl font-bold text-sm">Overwrite</button>
-                    <button onClick={() => resolveConflict('copy')} className="w-full py-3 bg-white border border-stone-200 text-stone-900 rounded-xl font-bold text-sm">Copy</button>
-                    <button onClick={() => resolveConflict('skip')} className="w-full py-3 bg-white border border-stone-200 text-stone-400 rounded-xl font-bold text-sm">Skip</button>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        )}
-
-        <header className="bg-white border-b border-stone-200 sticky top-0 z-50 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('recipes')}>
-              <div className="bg-amber-500 p-2 rounded-xl text-white shadow-lg"><i className="fas fa-beer-mug-empty text-2xl"></i></div>
-              <h1 className="text-2xl font-black font-serif italic">BREWMASTER <span className="text-amber-600">AI</span></h1>
-            </div>
-            
-            <nav className="hidden md:flex gap-8">
-              <button onClick={() => setView('recipes')} className={`font-bold transition-all text-sm ${view === 'recipes' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`}>{t('nav_recipes')}</button>
-              <button onClick={() => setView('brews')} className={`font-bold transition-all text-sm ${view === 'brews' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`}>{t('nav_brews')}</button>
-              <button onClick={() => setView('library')} className={`font-bold transition-all text-sm ${view === 'library' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`}>{t('nav_library')}</button>
-            </nav>
-
-            <div className="flex items-center gap-4">
-              <div className="flex bg-stone-100 p-1 rounded-xl">
-                {(['en', 'nl', 'fr'] as Language[]).map((l) => (
-                  <button 
-                    key={l}
-                    onClick={() => setLang(l)}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${lang === l ? 'bg-white text-amber-600 shadow-sm' : 'text-stone-400'}`}
-                  >
-                    {l}
-                  </button>
-                ))}
+                ) : null}
               </div>
-              <button onClick={() => { setSelectedRecipe(null); setView('create'); }} className="bg-stone-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-black transition-all shadow-md">
-                <i className="fas fa-plus mr-2"></i>{t('nav_new')}
-              </button>
             </div>
-          </div>
-        </header>
+          )}
 
-        <main className="max-w-7xl mx-auto px-4 py-10">
-          {view === 'recipes' && (
-            <div className="space-y-10 animate-in fade-in duration-500">
-              <div>
-                <h2 className="text-4xl font-black text-stone-900">{t('nav_recipes')}</h2>
+          <header className="bg-white border-b border-stone-200 sticky top-0 z-50 shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
+              <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('recipes')}>
+                <div className="bg-amber-500 p-2 rounded-xl text-white shadow-lg"><i className="fas fa-beer-mug-empty text-2xl"></i></div>
+                <h1 className="text-2xl font-black font-serif italic">BREWMASTER <span className="text-amber-600">AI</span></h1>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {recipes.length === 0 ? (
-                  <div className="col-span-full py-20 text-center bg-stone-50 rounded-3xl border-2 border-dashed border-stone-200 px-6">
-                    <i className="fas fa-beer text-4xl text-stone-200 mb-4"></i>
-                    <p className="text-stone-400 font-bold max-w-sm mx-auto">
-                      {t('empty_recipes_hint').split('Library')[0]}
-                      <button onClick={() => setView('library')} className="text-amber-600 underline hover:text-amber-700">
-                        {t('go_to_library')}
-                      </button>
-                      {t('empty_recipes_hint').split('Library')[1]}
-                    </p>
-                  </div>
-                ) : recipes.map(r => (
-                  <div key={r.id} className="bg-white rounded-3xl border border-stone-200 p-6 hover:shadow-xl transition-all border-b-4 group relative" style={{ borderBottomColor: getSRMColor(r.specifications?.color?.value || 0) }}>
+              
+              <nav className="hidden md:flex gap-8">
+                <button onClick={() => setView('recipes')} className={`font-bold transition-all text-sm ${view === 'recipes' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`}>{t('nav_recipes')}</button>
+                <button onClick={() => setView('brews')} className={`font-bold transition-all text-sm ${view === 'brews' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`}>{t('nav_brews')}</button>
+                <button onClick={() => setView('library')} className={`font-bold transition-all text-sm ${view === 'library' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`}>{t('nav_library')}</button>
+              </nav>
+
+              <div className="flex items-center gap-4">
+                <div className="flex bg-stone-100 p-1 rounded-xl">
+                  {(['en', 'nl', 'fr'] as Language[]).map((l) => (
                     <button 
-                      onClick={() => handleExportRecipeBeerXml(r)}
-                      title="Export BeerXML"
-                      className="absolute top-4 right-4 text-stone-300 hover:text-amber-600 transition-colors"
+                      key={l}
+                      onClick={() => setLang(l)}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${lang === l ? 'bg-white text-amber-600 shadow-sm' : 'text-stone-400'}`}
                     >
-                      <i className="fas fa-file-export text-lg"></i>
+                      {l}
                     </button>
-                    <h3 className="text-xl font-bold mb-4 pr-8 truncate group-hover:text-amber-800 transition-colors">{r.name}</h3>
-                    <div className="grid grid-cols-3 gap-2 mb-6">
-                      <div className="bg-stone-50 rounded-xl p-2 text-center"><p className="text-[8px] font-black text-stone-400 uppercase">ABV</p><p className="font-bold text-xs">{r.specifications?.abv?.value}%</p></div>
-                      <div className="bg-stone-50 rounded-xl p-2 text-center"><p className="text-[8px] font-black text-stone-400 uppercase">IBU</p><p className="font-bold text-xs">{r.specifications?.ibu?.value}</p></div>
-                      <div className="bg-stone-50 rounded-xl p-2 text-center"><p className="text-[8px] font-black text-stone-400 uppercase">OG</p><p className="font-bold text-xs">{r.specifications?.og?.value?.toFixed(3)}</p></div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => { setSelectedRecipe(r); setSelectedBrewLog(null); setView('log'); }} className="flex-1 bg-amber-600 text-white text-xs font-bold py-3 rounded-xl hover:bg-amber-700 transition-all shadow-lg shadow-amber-100">Brew</button>
-                      <button onClick={() => { setSelectedRecipe(r); setView('create'); }} className="flex-1 bg-stone-100 text-stone-900 text-xs font-bold py-3 rounded-xl hover:bg-stone-200 transition-all">Edit</button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <button onClick={() => { setSelectedRecipe(null); setView('create'); }} className="bg-stone-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-black transition-all shadow-md">
+                  <i className="fas fa-plus mr-2"></i>{t('nav_new')}
+                </button>
               </div>
             </div>
-          )}
-          {view === 'brews' && (
-            <BrewHistory 
-              logs={brewLogs} 
-              recipes={recipes} 
-              tastingNotes={tastingNotes}
-              onEditLog={(logId) => {
-                const log = brewLogs.find(l => l.id === logId);
-                const recipe = recipes.find(r => r.id === log?.recipeId);
-                if (log && recipe) { setSelectedBrewLog(log); setSelectedRecipe(recipe); setView('log'); }
-              }}
-              onAddTasting={(logId) => {
-                const log = brewLogs.find(l => l.id === logId);
-                const recipe = recipes.find(r => r.id === log?.recipeId);
-                if (log && recipe) { setSelectedBrewLog(log); setSelectedRecipe(recipe); setView('tasting'); }
-              }}
-            />
-          )}
-          {view === 'log' && selectedRecipe && (
-            <BrewLog 
-              recipe={selectedRecipe} 
-              initialLog={selectedBrewLog || undefined} 
-              onUpdate={handleUpdateBrewLog}
-              onSaveAndExit={handleSaveAndExitBrewLog}
-            />
-          )}
-          {view === 'create' && <RecipeCreator initialRecipe={selectedRecipe || undefined} onSave={handleSaveRecipe} library={library} />}
-          {view === 'library' && (
-            <IngredientLibrary 
-              ingredients={library} 
-              onUpdate={setLibrary} 
-              onExport={handleExportData}
-              onExportBeerXml={handleExportLibraryBeerXml}
-              onRestore={handleRestoreData}
-              onFileImport={handleFileImport}
-              onUrlImport={handleUrlImport}
-              xmlUrl={xmlUrl}
-              onXmlUrlChange={setXmlUrl}
-              importStatus={importStatus}
-            />
-          )}
-          {view === 'tasting' && selectedRecipe && selectedBrewLog && (
-            <TastingNotes recipe={selectedRecipe} brewLogId={selectedBrewLog.id} onSave={(note) => { setTastingNotes([note, ...tastingNotes]); setView('brews'); }} />
-          )}
-        </main>
+          </header>
+
+          <main className="max-w-7xl mx-auto px-4 py-10">
+            {view === 'recipes' && (
+              <div className="space-y-10 animate-in fade-in duration-500">
+                <div>
+                  <h2 className="text-4xl font-black text-stone-900">{t('nav_recipes')}</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {recipes.length === 0 ? (
+                    <div className="col-span-full py-20 text-center bg-white rounded-3xl border-2 border-dashed border-stone-200 px-6 shadow-sm">
+                      <i className="fas fa-beer text-5xl text-amber-100 mb-6 block"></i>
+                      <p className="text-stone-400 font-bold max-w-sm mx-auto mb-6">
+                        {t('empty_recipes_hint').split('Library')[0]}
+                        <button onClick={() => setView('library')} className="text-amber-600 underline hover:text-amber-700">
+                          {t('go_to_library')}
+                        </button>
+                        {t('empty_recipes_hint').split('Library')[1]}
+                      </p>
+                      <div className="flex flex-col items-center gap-4">
+                        <p className="text-xs font-black text-stone-300 uppercase tracking-widest">{t('demo_hint')}</p>
+                        <button 
+                          onClick={handleImportDemoData}
+                          className="bg-amber-600 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-xl hover:bg-amber-700 transition-all flex items-center gap-2"
+                        >
+                          <i className="fas fa-download"></i>
+                          {t('import_demo')}
+                        </button>
+                      </div>
+                    </div>
+                  ) : recipes.map(r => (
+                    <div key={r.id} className="bg-white rounded-3xl border border-stone-200 p-6 hover:shadow-xl transition-all border-b-4 group relative" style={{ borderBottomColor: getSRMColor(r.specifications?.color?.value || 0) }}>
+                      <div className="absolute top-4 right-4 flex gap-2">
+                        <button 
+                          onClick={() => handlePrintRecipe(r)}
+                          title={t('print_recipe')}
+                          className="text-stone-300 hover:text-stone-900 transition-colors"
+                        >
+                          <i className="fas fa-print text-lg"></i>
+                        </button>
+                        <button 
+                          onClick={() => handleExportRecipeBeerXml(r)}
+                          title="Export BeerXML"
+                          className="text-stone-300 hover:text-amber-600 transition-colors"
+                        >
+                          <i className="fas fa-file-export text-lg"></i>
+                        </button>
+                      </div>
+                      <h3 className="text-xl font-bold mb-4 pr-16 truncate group-hover:text-amber-800 transition-colors">{r.name}</h3>
+                      <div className="grid grid-cols-3 gap-2 mb-6">
+                        <div className="bg-stone-50 rounded-xl p-2 text-center"><p className="text-[8px] font-black text-stone-400 uppercase">ABV</p><p className="font-bold text-xs">{r.specifications?.abv?.value}%</p></div>
+                        <div className="bg-stone-50 rounded-xl p-2 text-center"><p className="text-[8px] font-black text-stone-400 uppercase">IBU</p><p className="font-bold text-xs">{r.specifications?.ibu?.value}</p></div>
+                        <div className="bg-stone-50 rounded-xl p-2 text-center"><p className="text-[8px] font-black text-stone-400 uppercase">OG</p><p className="font-bold text-xs">{r.specifications?.og?.value?.toFixed(3)}</p></div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setSelectedRecipe(r); setSelectedBrewLog(null); setView('log'); }} className="flex-1 bg-amber-600 text-white text-xs font-bold py-3 rounded-xl hover:bg-amber-700 transition-all shadow-lg shadow-amber-100">Brew</button>
+                        <button onClick={() => { setSelectedRecipe(r); setView('create'); }} className="flex-1 bg-stone-100 text-stone-900 text-xs font-bold py-3 rounded-xl hover:bg-stone-200 transition-all">Edit</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {view === 'brews' && (
+              <BrewHistory 
+                logs={brewLogs} 
+                recipes={recipes} 
+                tastingNotes={tastingNotes}
+                onEditLog={(logId) => {
+                  const log = brewLogs.find(l => l.id === logId);
+                  const recipe = recipes.find(r => r.id === log?.recipeId);
+                  if (log && recipe) { setSelectedBrewLog(log); setSelectedRecipe(recipe); setView('log'); }
+                }}
+                onAddTasting={(logId) => {
+                  const log = brewLogs.find(l => l.id === logId);
+                  const recipe = recipes.find(r => r.id === log?.recipeId);
+                  if (log && recipe) { setSelectedBrewLog(log); setSelectedRecipe(recipe); setView('tasting'); }
+                }}
+                onPrintReport={handlePrintBrewReport}
+              />
+            )}
+            {view === 'log' && selectedRecipe && (
+              <BrewLog 
+                recipe={selectedRecipe} 
+                initialLog={selectedBrewLog || undefined} 
+                onUpdate={handleUpdateBrewLog}
+                onSaveAndExit={handleSaveAndExitBrewLog}
+              />
+            )}
+            {view === 'create' && (
+              <RecipeCreator 
+                initialRecipe={selectedRecipe || undefined} 
+                onSave={handleSaveRecipe} 
+                onDelete={handleDeleteRecipe}
+                library={library} 
+              />
+            )}
+            {view === 'library' && (
+              <IngredientLibrary 
+                ingredients={library} 
+                onUpdate={setLibrary} 
+                onExport={handleExportData}
+                onExportBeerXml={handleExportLibraryBeerXml}
+                onRestore={handleRestoreData}
+                onFileImport={handleFileImport}
+                onUrlImport={handleUrlImport}
+                xmlUrl={xmlUrl}
+                onXmlUrlChange={setXmlUrl}
+                importStatus={importStatus}
+              />
+            )}
+            {view === 'tasting' && selectedRecipe && selectedBrewLog && (
+              <TastingNotes recipe={selectedRecipe} brewLogId={selectedBrewLog.id} onSave={(note) => { setTastingNotes([note, ...tastingNotes]); setView('brews'); }} />
+            )}
+          </main>
+        </div>
       </div>
     </LanguageContext.Provider>
   );
