@@ -61,6 +61,34 @@ const PrintView: React.FC<PrintViewProps> = ({ recipe, log, tastingNote }) => {
           </section>
         )}
 
+        {recipe.mash && recipe.mash.steps.length > 0 && (
+          <section>
+            <h2 className="text-lg font-black uppercase border-b-2 border-stone-900 pb-2 mb-4">{t('mash_profile')} - {recipe.mash.name}</h2>
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b-2 border-stone-200 text-[10px] uppercase text-stone-400">
+                  <th className="py-2">{t('step_name')}</th>
+                  <th className="py-2">{t('mash_type')}</th>
+                  <th className="py-2">{t('step_temp')}</th>
+                  <th className="py-2">{t('step_time')}</th>
+                  <th className="py-2 text-right">{t('infuse_amount')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recipe.mash.steps.map((step, i) => (
+                  <tr key={i} className="border-b border-stone-100">
+                    <td className="py-3 font-bold text-stone-900">{step.name}</td>
+                    <td className="py-3 capitalize text-stone-500">{step.type}</td>
+                    <td className="py-3">{step.step_temp}°C</td>
+                    <td className="py-3">{step.step_time} min</td>
+                    <td className="py-3 text-right">{step.infuse_amount ? `${step.infuse_amount} L` : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
+
         <section>
           <h2 className="text-lg font-black uppercase border-b-2 border-stone-900 pb-2 mb-4">{t('ingredients_header')}</h2>
           
@@ -79,7 +107,7 @@ const PrintView: React.FC<PrintViewProps> = ({ recipe, log, tastingNote }) => {
                   {recipe.ingredients.fermentables.map((f, i) => (
                     <tr key={i} className="border-b border-stone-100">
                       <td className="py-3 font-bold text-stone-900">{f.name}</td>
-                      <td className="py-3">{f.amount.value} {f.amount.unit}</td>
+                      <td className="py-3">{f.amount?.value ?? 0} {f.amount?.unit ?? 'kg'}</td>
                       <td className="py-3 text-right">{f.color?.value} SRM</td>
                     </tr>
                   ))}
@@ -102,8 +130,8 @@ const PrintView: React.FC<PrintViewProps> = ({ recipe, log, tastingNote }) => {
                     {recipe.ingredients.hops.map((h, i) => (
                       <tr key={i} className="border-b border-stone-100">
                         <td className="py-3 font-bold text-stone-900">{h.name} ({h.alpha_acid?.value}%)</td>
-                        <td className="py-3">{h.time.value} {h.time.unit}</td>
-                        <td className="py-3 text-right">{h.amount.value} {h.amount.unit}</td>
+                        <td className="py-3">{h.time?.value ?? 0} {h.time?.unit ?? 'min'}</td>
+                        <td className="py-3 text-right">{h.amount?.value ?? 0} {h.amount?.unit ?? 'g'}</td>
                       </tr>
                     ))}
                   </tbody>

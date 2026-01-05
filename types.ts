@@ -7,12 +7,62 @@ export interface BeerJSON {
 export interface LibraryIngredient {
   id: string;
   name: string;
-  type: string;
+  type: string; // 'fermentable' | 'hop' | 'culture' | 'mash_profile' | 'misc' | 'style'
   color?: number;
   yield?: number;
   alpha?: number;
   attenuation?: number;
   form?: string;
+  
+  // Misc specific
+  misc_type?: 'spice' | 'fining' | 'water_agent' | 'herb' | 'flavor' | 'other';
+  misc_use?: 'boil' | 'mash' | 'primary' | 'secondary' | 'bottling';
+  amount_is_weight?: boolean;
+  use_for?: string;
+
+  // Style specific
+  category?: string;
+  style_guide?: string;
+  style_type?: 'lager' | 'ale' | 'mead' | 'wheat' | 'mixed' | 'cider';
+  og_min?: number;
+  og_max?: number;
+  fg_min?: number;
+  fg_max?: number;
+  ibu_min?: number;
+  ibu_max?: number;
+  color_min?: number;
+  color_max?: number;
+  abv_min?: number;
+  abv_max?: number;
+  profile?: string;
+  examples?: string;
+
+  // Mash specific library fields
+  grain_temp?: number;
+  sparge_temp?: number;
+  ph?: number;
+  steps?: MashStep[];
+  notes?: string;
+}
+
+export interface MashStep {
+  name: string;
+  type: 'infusion' | 'temperature' | 'decoction';
+  infuse_amount?: number; // Liters
+  step_temp: number; // Celsius
+  step_time: number; // Minutes
+  ramp_time?: number; // Minutes
+  end_temp?: number; // Celsius
+  description?: string;
+}
+
+export interface MashProfile {
+  name: string;
+  grain_temp?: number;
+  notes?: string;
+  sparge_temp?: number;
+  ph?: number;
+  steps: MashStep[];
 }
 
 export interface Recipe {
@@ -28,6 +78,7 @@ export interface Recipe {
   style?: {
     name: string;
     category?: string;
+    libraryId?: string;
   };
   ingredients: {
     fermentables: Fermentable[];
@@ -36,6 +87,7 @@ export interface Recipe {
     miscellaneous?: Misc[];
     water?: Water[];
   };
+  mash?: MashProfile;
   efficiency: {
     brewhouse: number;
   };
@@ -85,6 +137,7 @@ export interface Misc {
   use: string;
   amount: { unit: string; value: number };
   time: { unit: string; value: number };
+  libraryId?: string;
 }
 
 export interface Water {

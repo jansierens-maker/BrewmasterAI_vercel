@@ -3,14 +3,12 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Recipe } from "../types";
 
 export class GeminiService {
-  private ai: GoogleGenAI;
-
-  constructor() {
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  }
+  // Instance-level GoogleGenAI is removed to follow best practices of instantiating right before use.
 
   async generateRecipe(prompt: string): Promise<Recipe> {
-    const response = await this.ai.models.generateContent({
+    // Initializing right before API call ensures we use the correct environment API_KEY.
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: `Generate a detailed beer recipe in BeerJSON structure based on the following request: ${prompt}. 
       
@@ -136,7 +134,9 @@ export class GeminiService {
   }
 
   async analyzeTasting(recipe: Recipe, notes: string): Promise<string> {
-    const response = await this.ai.models.generateContent({
+    // Initializing right before API call ensures we use the correct environment API_KEY.
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `As a Master Cicerone, analyze this recipe and the following tasting notes:
       

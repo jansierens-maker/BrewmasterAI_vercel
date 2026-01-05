@@ -6,13 +6,14 @@ import TastingNotes from './components/TastingNotes';
 import IngredientLibrary from './components/IngredientLibrary';
 import BrewHistory from './components/BrewHistory';
 import PrintView from './components/PrintView';
+import AdminView from './components/AdminView';
 import { Recipe, BrewLogEntry, TastingNote, LibraryIngredient } from './types';
 import { getSRMColor } from './services/calculations';
 import { parseBeerXml, BeerXmlImportResult } from './services/beerXmlService';
 import { exportToBeerXml, exportLibraryToBeerXml } from './services/beerXmlExportService';
 import { translations, Language } from './services/i18n';
 
-type View = 'recipes' | 'create' | 'log' | 'tasting' | 'library' | 'brews';
+type View = 'recipes' | 'create' | 'log' | 'tasting' | 'library' | 'brews' | 'admin';
 type ImportStatus = 'idle' | 'fetching' | 'parsing' | 'resolving';
 
 interface LanguageContextType {
@@ -33,6 +34,15 @@ const EXAMPLES: LibraryIngredient[] = [
   { id: 'g1', name: 'Pilsner Malt', type: 'fermentable', color: 1.6, yield: 80 },
   { id: 'h1', name: 'Cascade', type: 'hop', alpha: 5.5 },
   { id: 'y1', name: 'US-05 SafAle', type: 'culture', form: 'dry', attenuation: 78 },
+  { 
+    id: 'm1', 
+    name: 'Single Infusion (67°C)', 
+    type: 'mash_profile', 
+    steps: [
+      { name: 'Mash In', type: 'infusion', step_temp: 67, step_time: 60, infuse_amount: 15 },
+      { name: 'Mash Out', type: 'temperature', step_temp: 76, step_time: 10 }
+    ] 
+  },
 ];
 
 const App: React.FC = () => {
@@ -53,21 +63,16 @@ const App: React.FC = () => {
 
   const [printData, setPrintData] = useState<{ recipe?: Recipe, log?: BrewLogEntry, tastingNote?: TastingNote } | null>(null);
 
-  // Print Effect: Listen for data and trigger print, then cleanup
   useEffect(() => {
     if (printData) {
       const handleAfterPrint = () => {
         setPrintData(null);
         window.removeEventListener('afterprint', handleAfterPrint);
       };
-
       window.addEventListener('afterprint', handleAfterPrint);
-
-      // Wait a frame to ensure PrintView is rendered in DOM
       const timer = setTimeout(() => {
         window.print();
       }, 300);
-
       return () => {
         clearTimeout(timer);
         window.removeEventListener('afterprint', handleAfterPrint);
@@ -131,14 +136,7 @@ const App: React.FC = () => {
   };
 
   const handleExportData = () => {
-    const data = {
-      version: 1,
-      exportDate: new Date().toISOString(),
-      recipes,
-      brewLogs,
-      tastingNotes,
-      library
-    };
+    const data = { version: 1, exportDate: new Date().toISOString(), recipes, brewLogs, tastingNotes, library };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -191,7 +189,6 @@ const App: React.FC = () => {
   const handleRestoreData = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -215,13 +212,15 @@ const App: React.FC = () => {
     result.fermentables.forEach(f => queue.push({ type: 'library', data: f }));
     result.hops.forEach(h => queue.push({ type: 'library', data: h }));
     result.cultures.forEach(c => queue.push({ type: 'library', data: c }));
+    result.mashes.forEach(m => queue.push({ type: 'library', data: m }));
+    result.styles.forEach(s => queue.push({ type: 'library', data: s }));
+    result.miscs.forEach(mi => queue.push({ type: 'library', data: mi }));
     
     if (queue.length === 0) {
       alert("No data found in the XML.");
       setImportStatus('idle');
       return;
     }
-
     setImportQueue(queue);
     setImportStatus('resolving');
     processQueue(queue, recipes, library);
@@ -232,16 +231,13 @@ const App: React.FC = () => {
       setImportStatus('idle');
       return;
     }
-
     const next = currentQueue[0];
     let isDuplicate = false;
-
     if (next.type === 'recipe') {
       isDuplicate = currentRecipes.some(r => r.name.toLowerCase() === next.data.name.toLowerCase());
     } else {
       isDuplicate = currentLib.some(l => l.name.toLowerCase() === next.data.name.toLowerCase() && l.type === next.data.type);
     }
-
     if (isDuplicate) {
       if (next.type === 'recipe') {
         const nextQ = currentQueue.slice(1);
@@ -253,7 +249,6 @@ const App: React.FC = () => {
     } else {
       let newRecipes = [...currentRecipes];
       let newLib = [...currentLib];
-      
       if (next.type === 'recipe') {
         const linked = linkIngredientsToLibrary(next.data, newLib);
         newRecipes.push(linked);
@@ -264,7 +259,6 @@ const App: React.FC = () => {
         newLib.push(newItem);
         setLibrary(newLib);
       }
-
       const nextQ = currentQueue.slice(1);
       setImportQueue(nextQ);
       processQueue(nextQ, newRecipes, newLib);
@@ -279,7 +273,6 @@ const App: React.FC = () => {
       tempLib.push({ id: newId, name, type, ...props } as LibraryIngredient);
       return newId;
     };
-
     return {
       ...recipe,
       ingredients: {
@@ -305,11 +298,9 @@ const App: React.FC = () => {
   const resolveConflict = (action: 'cancel' | 'skip' | 'overwrite' | 'copy') => {
     if (!currentDuplicate) return;
     if (action === 'cancel') { setImportQueue([]); setCurrentDuplicate(null); setImportStatus('idle'); return; }
-
     let updatedRecipes = [...recipes];
     let updatedLib = [...library];
     const nextQueue = importQueue.slice(1);
-
     if (action === 'overwrite') {
       if (currentDuplicate.type === 'recipe') {
         const linked = linkIngredientsToLibrary(currentDuplicate.data, updatedLib);
@@ -333,7 +324,6 @@ const App: React.FC = () => {
         setLibrary(updatedLib);
       }
     }
-
     setImportQueue(nextQueue);
     setCurrentDuplicate(null);
     processQueue(nextQueue, updatedRecipes, updatedLib);
@@ -349,23 +339,17 @@ const App: React.FC = () => {
   };
 
   const handleUrlImport = async (urlInput?: any) => {
-    // Determine the target URL. If called by an event, ignore the event object.
     const targetUrl = typeof urlInput === 'string' ? urlInput : xmlUrl;
-    
     if (!targetUrl) return;
     setImportStatus('fetching');
     try {
-      // Using corsproxy.io as a more robust alternative to allorigins
       const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
       const response = await fetch(proxyUrl);
       if (!response.ok) throw new Error("Network response was not ok");
-      
       const xmlText = await response.text();
       if (!xmlText) throw new Error("Received empty content from URL");
-
       setImportStatus('parsing');
       startImportFlow(parseBeerXml(xmlText));
-      
       if (targetUrl === xmlUrl) setXmlUrl('');
     } catch (err) {
       console.error("Import failed:", err);
@@ -381,19 +365,15 @@ const App: React.FC = () => {
   return (
     <LanguageContext.Provider value={{ lang, setLang, t }}>
       <div className="min-h-screen bg-stone-50 text-stone-900 print:bg-white print:p-0">
-        
-        {/* PRINT VIEW (ONLY VISIBLE ON PRINT) */}
         {printData && (
           <div className="absolute inset-0 z-[300] bg-white pointer-events-none print:pointer-events-auto">
             <PrintView recipe={printData.recipe} log={printData.log} tastingNote={printData.tastingNote} />
           </div>
         )}
-
         <div className="print:hidden">
-          {/* GLOBAL IMPORT OVERLAY */}
           {importStatus !== 'idle' && (
             <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6">
-              <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-300">
+              <div className="bg-white rounded-3xl p-8 max-sm w-full shadow-2xl animate-in zoom-in-95 duration-300">
                 {importStatus !== 'resolving' ? (
                   <div className="text-center space-y-4">
                     <div className="relative w-16 h-16 mx-auto">
@@ -422,87 +402,48 @@ const App: React.FC = () => {
               </div>
             </div>
           )}
-
           <header className="bg-white border-b border-stone-200 sticky top-0 z-50 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
               <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('recipes')}>
                 <div className="bg-amber-500 p-2 rounded-xl text-white shadow-lg"><i className="fas fa-beer-mug-empty text-2xl"></i></div>
                 <h1 className="text-2xl font-black font-serif italic">BREWMASTER <span className="text-amber-600">AI</span></h1>
               </div>
-              
               <nav className="hidden md:flex gap-8">
                 <button onClick={() => setView('recipes')} className={`font-bold transition-all text-sm ${view === 'recipes' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`}>{t('nav_recipes')}</button>
                 <button onClick={() => setView('brews')} className={`font-bold transition-all text-sm ${view === 'brews' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`}>{t('nav_brews')}</button>
                 <button onClick={() => setView('library')} className={`font-bold transition-all text-sm ${view === 'library' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`}>{t('nav_library')}</button>
+                <button onClick={() => setView('admin')} className={`font-bold transition-all text-sm ${view === 'admin' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`}>{t('nav_admin')}</button>
               </nav>
-
               <div className="flex items-center gap-4">
                 <div className="flex bg-stone-100 p-1 rounded-xl">
                   {(['en', 'nl', 'fr'] as Language[]).map((l) => (
-                    <button 
-                      key={l}
-                      onClick={() => setLang(l)}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${lang === l ? 'bg-white text-amber-600 shadow-sm' : 'text-stone-400'}`}
-                    >
-                      {l}
-                    </button>
+                    <button key={l} onClick={() => setLang(l)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${lang === l ? 'bg-white text-amber-600 shadow-sm' : 'text-stone-400'}`}> {l} </button>
                   ))}
                 </div>
-                <button onClick={() => { setSelectedRecipe(null); setView('create'); }} className="bg-stone-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-black transition-all shadow-md">
-                  <i className="fas fa-plus mr-2"></i>{t('nav_new')}
-                </button>
+                <button onClick={() => { setSelectedRecipe(null); setView('create'); }} className="bg-stone-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-black transition-all shadow-md"> <i className="fas fa-plus mr-2"></i>{t('nav_new')} </button>
               </div>
             </div>
           </header>
-
           <main className="max-w-7xl mx-auto px-4 py-10 pb-32">
             {view === 'recipes' && (
               <div className="space-y-10 animate-in fade-in duration-500">
-                <div>
-                  <h2 className="text-4xl font-black text-stone-900">{t('nav_recipes')}</h2>
-                </div>
+                <div> <h2 className="text-4xl font-black text-stone-900">{t('nav_recipes')}</h2> </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {recipes.length === 0 ? (
                     <div className="col-span-full py-20 text-center bg-white rounded-3xl border-2 border-dashed border-stone-200 px-6 shadow-sm">
                       <i className="fas fa-beer text-5xl text-amber-100 mb-6 block"></i>
-                      <p className="text-stone-400 font-bold max-w-sm mx-auto mb-6">
-                        {t('empty_recipes_hint').split('Library')[0]}
-                        <button onClick={() => setView('library')} className="text-amber-600 underline hover:text-amber-700">
-                          {t('go_to_library')}
-                        </button>
-                        {t('empty_recipes_hint').split('Library')[1]}
-                      </p>
-                      <div className="flex flex-col items-center gap-4">
-                        <p className="text-xs font-black text-stone-300 uppercase tracking-widest">{t('demo_hint')}</p>
-                        <button 
-                          onClick={handleImportDemoData}
-                          className="bg-amber-600 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-xl hover:bg-amber-700 transition-all flex items-center gap-2"
-                        >
-                          <i className="fas fa-download"></i>
-                          {t('import_demo')}
-                        </button>
-                      </div>
+                      <p className="text-stone-400 font-bold max-w-sm mx-auto mb-6"> {t('empty_recipes_hint').split('Library')[0]} <button onClick={() => setView('library')} className="text-amber-600 underline hover:text-amber-700"> {t('go_to_library')} </button> {t('empty_recipes_hint').split('Library')[1]} </p>
+                      <div className="flex flex-col items-center gap-4"> <p className="text-xs font-black text-stone-300 uppercase tracking-widest">{t('demo_hint')}</p> <button onClick={handleImportDemoData} className="bg-amber-600 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-xl hover:bg-amber-700 transition-all flex items-center gap-2"> <i className="fas fa-download"></i> {t('import_demo')} </button> </div>
                     </div>
                   ) : recipes.map(r => (
                     <div key={r.id} className="bg-white rounded-3xl border border-stone-200 p-6 hover:shadow-xl transition-all border-b-4 group relative" style={{ borderBottomColor: getSRMColor(r.specifications?.color?.value || 0) }}>
                       <div className="absolute top-4 right-4 flex gap-2">
-                        <button 
-                          onClick={() => handlePrintRecipe(r)}
-                          title={t('print_recipe')}
-                          className="text-stone-300 hover:text-stone-900 transition-colors"
-                        >
-                          <i className="fas fa-print text-lg"></i>
-                        </button>
-                        <button 
-                          onClick={() => handleExportRecipeBeerXml(r)}
-                          title="Export BeerXML"
-                          className="text-stone-300 hover:text-amber-600 transition-colors"
-                        >
-                          <i className="fas fa-file-export text-lg"></i>
-                        </button>
+                        <button onClick={() => handlePrintRecipe(r)} title={t('print_recipe')} className="text-stone-300 hover:text-stone-900 transition-colors"> <i className="fas fa-print text-lg"></i> </button>
+                        <button onClick={() => handleExportRecipeBeerXml(r)} title="Export BeerXML" className="text-stone-300 hover:text-amber-600 transition-colors"> <i className="fas fa-file-export text-lg"></i> </button>
                       </div>
                       <h3 className="text-xl font-bold mb-4 pr-16 truncate group-hover:text-amber-800 transition-colors">{r.name}</h3>
-                      <div className="grid grid-cols-3 gap-2 mb-6">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">
+                        <div className="bg-stone-50 rounded-xl p-2 text-center"><p className="text-[8px] font-black text-stone-400 uppercase">Batch</p><p className="font-bold text-xs">{r.batch_size.value} L</p></div>
                         <div className="bg-stone-50 rounded-xl p-2 text-center"><p className="text-[8px] font-black text-stone-400 uppercase">ABV</p><p className="font-bold text-xs">{r.specifications?.abv?.value}%</p></div>
                         <div className="bg-stone-50 rounded-xl p-2 text-center"><p className="text-[8px] font-black text-stone-400 uppercase">IBU</p><p className="font-bold text-xs">{r.specifications?.ibu?.value}</p></div>
                         <div className="bg-stone-50 rounded-xl p-2 text-center"><p className="text-[8px] font-black text-stone-400 uppercase">OG</p><p className="font-bold text-xs">{r.specifications?.og?.value?.toFixed(3)}</p></div>
@@ -517,52 +458,17 @@ const App: React.FC = () => {
               </div>
             )}
             {view === 'brews' && (
-              <BrewHistory 
-                logs={brewLogs} 
-                recipes={recipes} 
-                tastingNotes={tastingNotes}
-                onEditLog={(logId) => {
-                  const log = brewLogs.find(l => l.id === logId);
-                  const recipe = recipes.find(r => r.id === log?.recipeId);
-                  if (log && recipe) { setSelectedBrewLog(log); setSelectedRecipe(recipe); setView('log'); }
-                }}
-                onAddTasting={(logId) => {
-                  const log = brewLogs.find(l => l.id === logId);
-                  const recipe = recipes.find(r => r.id === log?.recipeId);
-                  if (log && recipe) { setSelectedBrewLog(log); setSelectedRecipe(recipe); setView('tasting'); }
-                }}
-                onPrintReport={handlePrintBrewReport}
-              />
+              <BrewHistory logs={brewLogs} recipes={recipes} tastingNotes={tastingNotes} onEditLog={(logId) => { const log = brewLogs.find(l => l.id === logId); const recipe = recipes.find(r => r.id === log?.recipeId); if (log && recipe) { setSelectedBrewLog(log); setSelectedRecipe(recipe); setView('log'); } }} onAddTasting={(logId) => { const log = brewLogs.find(l => l.id === logId); const recipe = recipes.find(r => r.id === log?.recipeId); if (log && recipe) { setSelectedBrewLog(log); setSelectedRecipe(recipe); setView('tasting'); } }} onPrintReport={handlePrintBrewReport} />
             )}
             {view === 'log' && selectedRecipe && (
-              <BrewLog 
-                recipe={selectedRecipe} 
-                initialLog={selectedBrewLog || undefined} 
-                onUpdate={handleUpdateBrewLog}
-                onSaveAndExit={handleSaveAndExitBrewLog}
-              />
+              <BrewLog recipe={selectedRecipe} initialLog={selectedBrewLog || undefined} onUpdate={handleUpdateBrewLog} onSaveAndExit={handleSaveAndExitBrewLog} />
             )}
             {view === 'create' && (
-              <RecipeCreator 
-                initialRecipe={selectedRecipe || undefined} 
-                onSave={handleSaveRecipe} 
-                onDelete={handleDeleteRecipe}
-                library={library} 
-              />
+              <RecipeCreator initialRecipe={selectedRecipe || undefined} onSave={handleSaveRecipe} onDelete={handleDeleteRecipe} library={library} />
             )}
-            {view === 'library' && (
-              <IngredientLibrary 
-                ingredients={library} 
-                onUpdate={setLibrary} 
-                onExport={handleExportData}
-                onExportBeerXml={handleExportLibraryBeerXml}
-                onRestore={handleRestoreData}
-                onFileImport={handleFileImport}
-                onUrlImport={handleUrlImport}
-                xmlUrl={xmlUrl}
-                onXmlUrlChange={setXmlUrl}
-                importStatus={importStatus}
-              />
+            {view === 'library' && ( <IngredientLibrary ingredients={library} onUpdate={setLibrary} /> )}
+            {view === 'admin' && (
+              <AdminView onExport={handleExportData} onExportBeerXml={handleExportLibraryBeerXml} onRestore={handleRestoreData} onFileImport={handleFileImport} onUrlImport={handleUrlImport} xmlUrl={xmlUrl} onXmlUrlChange={setXmlUrl} importStatus={importStatus} />
             )}
             {view === 'tasting' && selectedRecipe && selectedBrewLog && (
               <TastingNotes recipe={selectedRecipe} brewLogId={selectedBrewLog.id} onSave={(note) => { setTastingNotes([note, ...tastingNotes]); setView('brews'); }} />

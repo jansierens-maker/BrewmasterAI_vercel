@@ -22,7 +22,8 @@ export const getSRMColor = (srm: number): string => {
 /**
  * Normalizes common unit strings to standard internal keys
  */
-const normalizeUnit = (unit: string): string => {
+const normalizeUnit = (unit: string | undefined): string => {
+  if (!unit) return '';
   const u = unit.toLowerCase().trim();
   if (u.startsWith('kg') || u.startsWith('kilo')) return 'kilograms';
   if (u.startsWith('lb') || u.startsWith('pound')) return 'pounds';
@@ -72,13 +73,14 @@ export const calculateRecipeStats = (recipe: Recipe, alphaOverrides?: Record<str
 
   let totalPoints = 0;
   recipe.ingredients.fermentables.forEach(f => {
+    if (!f.amount) return;
     const unit = normalizeUnit(f.amount.unit);
     const weightKg = unit === 'kilograms' ? f.amount.value : f.amount.value * 0.453592;
     // Fallback to 1.037 if potential is missing
     const potential = f.yield?.potential?.value || 1.037;
     const ppg = (potential - 1) * 1000;
     const pkl = ppg * 8.3454; // Convert points/gal/lb to points/L/kg
-    totalPoints += (weightKg * pkl * efficiency) / batchSizeL;
+    totalPoints += (weightKg * pkl * efficiency) / (batchSizeL || 1);
   });
 
   const og = 1 + (totalPoints / 1000);
@@ -93,16 +95,18 @@ export const calculateRecipeStats = (recipe: Recipe, alphaOverrides?: Record<str
 
   let mcu = 0;
   recipe.ingredients.fermentables.forEach(f => {
+    if (!f.amount) return;
     const unit = normalizeUnit(f.amount.unit);
     const weightLbs = unit === 'pounds' ? f.amount.value : f.amount.value * 2.20462;
     const colorSRM = f.color?.value || 2;
     const volumeGal = batchSizeL / 3.78541;
-    mcu += (weightLbs * colorSRM) / volumeGal;
+    mcu += (weightLbs * colorSRM) / (volumeGal || 1);
   });
   const colorSRM = mcu > 0 ? 1.4922 * Math.pow(mcu, 0.6859) : 0;
 
   let ibu = 0;
   recipe.ingredients.hops.forEach(h => {
+    if (!h.amount || !h.time) return;
     if (h.use === 'boil' || h.use === 'first_wort' || h.use === 'whirlpool') {
       const alpha = alphaOverrides?.[h.name] !== undefined ? alphaOverrides[h.name] : (h.alpha_acid?.value || 5);
       const unit = normalizeUnit(h.amount.unit);
@@ -116,7 +120,7 @@ export const calculateRecipeStats = (recipe: Recipe, alphaOverrides?: Record<str
       
       if (h.use === 'whirlpool') utilization = bignessFactor * ((1 - Math.exp(-0.04 * 10)) / 4.15) * 0.5;
       
-      ibu += (alpha * weightG * utilization * 10) / batchSizeL;
+      ibu += (alpha * weightG * utilization * 10) / (batchSizeL || 1);
     }
   });
 

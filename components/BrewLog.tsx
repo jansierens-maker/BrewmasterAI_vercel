@@ -190,9 +190,33 @@ const BrewLog: React.FC<BrewLogProps> = ({ recipe, initialLog, onUpdate, onSaveA
               </div>
             </div>
 
+            {/* Mash Schedule Visibility */}
+            {recipe.mash && recipe.mash.steps.length > 0 && (
+              <div className="space-y-4 pt-6 border-t border-stone-100">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-black flex items-center gap-2">
+                    <i className="fas fa-thermometer-half text-red-600"></i> {t('mash_profile')}: {recipe.mash.name}
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {recipe.mash.steps.map((s, idx) => (
+                    <div key={idx} className="p-4 bg-stone-50 rounded-2xl border border-stone-100 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-stone-200 flex items-center justify-center font-black text-stone-600 text-xs">{idx + 1}</div>
+                      <div>
+                        <p className="font-bold text-stone-900 leading-none mb-1">{s.name}</p>
+                        <p className="text-[10px] font-black text-stone-400 uppercase">
+                          {s.step_temp}°C • {s.step_time} min • <span className="text-stone-500">{s.type}</span>
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Ingredients & Schedule Section */}
-            <div className="space-y-6">
-              <div className="border-b border-stone-100 pb-4">
+            <div className="space-y-6 pt-6 border-t border-stone-100">
+              <div className="pb-4">
                 <h3 className="text-xl font-black flex items-center gap-2"><i className="fas fa-list-check text-amber-600"></i> {t('additions')}</h3>
               </div>
 
@@ -202,7 +226,7 @@ const BrewLog: React.FC<BrewLogProps> = ({ recipe, initialLog, onUpdate, onSaveA
                 {recipe.ingredients.fermentables.map((f, i) => (
                   <div key={i} className="flex justify-between items-center p-4 bg-stone-50 rounded-2xl border border-stone-100">
                     <div className="font-bold text-stone-900">{f.name}</div>
-                    <div className="text-sm font-black text-stone-400 uppercase">{f.amount.value} {f.amount.unit === 'kilograms' ? 'kg' : 'lbs'}</div>
+                    <div className="text-sm font-black text-stone-400 uppercase">{f.amount?.value ?? 0} kg</div>
                   </div>
                 ))}
               </div>
@@ -219,7 +243,7 @@ const BrewLog: React.FC<BrewLogProps> = ({ recipe, initialLog, onUpdate, onSaveA
                            <div className="font-bold text-stone-900">{h.name}</div>
                         </div>
                         <div className="text-[10px] font-bold text-stone-400 uppercase mt-1">
-                          <i className="fas fa-clock mr-1"></i> {h.time.value} {h.time.unit} • {h.amount.value} {h.amount.unit === 'grams' ? 'g' : 'oz'}
+                          <i className="fas fa-clock mr-1"></i> {h.time?.value ?? 0} min • {h.amount?.value ?? 0} g
                         </div>
                       </div>
                       

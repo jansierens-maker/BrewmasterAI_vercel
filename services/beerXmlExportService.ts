@@ -14,73 +14,56 @@ export const exportToBeerXml = (recipe: Recipe): string => {
   xmlParts.push(`    <NAME>${sanitize(recipe.name)}</NAME>`);
   xmlParts.push('    <VERSION>1</VERSION>');
   xmlParts.push(`    <TYPE>${recipe.type === 'all_grain' ? 'All Grain' : recipe.type === 'extract' ? 'Extract' : 'Partial Mash'}</TYPE>`);
-  xmlParts.push(`    <BREWER>${sanitize(recipe.author || 'BrewMaster AI')}</BREWER>`);
-  xmlParts.push(`    <BATCH_SIZE>${recipe.batch_size.value}</BATCH_SIZE>`);
-  xmlParts.push(`    <BOIL_SIZE>${recipe.batch_size.value + 5}</BOIL_SIZE>`); // Simple estimation
-  xmlParts.push(`    <BOIL_TIME>${recipe.boil_time.value}</BOIL_TIME>`);
-  xmlParts.push(`    <EFFICIENCY>${recipe.efficiency.brewhouse}</EFFICIENCY>`);
   
-  if (recipe.notes) {
-    xmlParts.push(`    <NOTES>${sanitize(recipe.notes)}</NOTES>`);
-  }
-
-  // Export calculated specifications so they can be re-imported
-  if (recipe.specifications) {
-    if (recipe.specifications.og) xmlParts.push(`    <EST_OG>${recipe.specifications.og.value}</EST_OG>`);
-    if (recipe.specifications.fg) xmlParts.push(`    <EST_FG>${recipe.specifications.fg.value}</EST_FG>`);
-    if (recipe.specifications.abv) xmlParts.push(`    <EST_ABV>${recipe.specifications.abv.value}</EST_ABV>`);
-    if (recipe.specifications.ibu) xmlParts.push(`    <IBU>${recipe.specifications.ibu.value}</IBU>`);
-    if (recipe.specifications.color) xmlParts.push(`    <EST_COLOR>${recipe.specifications.color.value}</EST_COLOR>`);
-  }
-
   if (recipe.style) {
     xmlParts.push('    <STYLE>');
     xmlParts.push(`      <NAME>${sanitize(recipe.style.name)}</NAME>`);
-    xmlParts.push(`      <CATEGORY>${sanitize(recipe.style.category || '')}</CATEGORY>`);
+    xmlParts.push(`      <CATEGORY>${sanitize(recipe.style.category || "")}</CATEGORY>`);
     xmlParts.push('      <VERSION>1</VERSION>');
     xmlParts.push('    </STYLE>');
   }
 
-  // Fermentables
+  xmlParts.push(`    <BREWER>${sanitize(recipe.author || 'BrewMaster AI')}</BREWER>`);
+  xmlParts.push(`    <BATCH_SIZE>${recipe.batch_size.value}</BATCH_SIZE>`);
+  xmlParts.push(`    <BOIL_TIME>${recipe.boil_time.value}</BOIL_TIME>`);
+  xmlParts.push(`    <EFFICIENCY>${recipe.efficiency.brewhouse}</EFFICIENCY>`);
+  
+  // Ingredients
   xmlParts.push('    <FERMENTABLES>');
   recipe.ingredients.fermentables.forEach(f => {
     xmlParts.push('      <FERMENTABLE>');
     xmlParts.push(`        <NAME>${sanitize(f.name)}</NAME>`);
-    xmlParts.push(`        <VERSION>1</VERSION>`);
     xmlParts.push(`        <AMOUNT>${f.amount.value}</AMOUNT>`);
-    xmlParts.push(`        <TYPE>${sanitize(f.type || 'Grain')}</TYPE>`);
-    xmlParts.push(`        <YIELD>${f.yield?.potential?.value ? ((f.yield.potential.value - 1) * 100 / 0.046).toFixed(1) : 75}</YIELD>`);
     xmlParts.push(`        <COLOR>${f.color?.value || 0}</COLOR>`);
     xmlParts.push('      </FERMENTABLE>');
   });
   xmlParts.push('    </FERMENTABLES>');
 
-  // Hops
   xmlParts.push('    <HOPS>');
   recipe.ingredients.hops.forEach(h => {
     xmlParts.push('      <HOP>');
     xmlParts.push(`        <NAME>${sanitize(h.name)}</NAME>`);
-    xmlParts.push(`        <VERSION>1</VERSION>`);
     xmlParts.push(`        <ALPHA>${h.alpha_acid?.value || 0}</ALPHA>`);
-    xmlParts.push(`        <AMOUNT>${h.amount.value / 1000}</AMOUNT>`); // BeerXML expects KG
-    xmlParts.push(`        <USE>${h.use === 'boil' ? 'Boil' : h.use === 'dry_hop' ? 'Dry Hop' : h.use === 'first_wort' ? 'First Wort' : 'Aroma'}</USE>`);
+    xmlParts.push(`        <AMOUNT>${h.amount.value / 1000}</AMOUNT>`);
+    xmlParts.push(`        <USE>${sanitize(h.use)}</USE>`);
     xmlParts.push(`        <TIME>${h.time.value}</TIME>`);
     xmlParts.push('      </HOP>');
   });
   xmlParts.push('    </HOPS>');
 
-  // Yeasts
-  xmlParts.push('    <YEASTS>');
-  recipe.ingredients.cultures.forEach(y => {
-    xmlParts.push('      <YEAST>');
-    xmlParts.push(`        <NAME>${sanitize(y.name)}</NAME>`);
-    xmlParts.push(`        <VERSION>1</VERSION>`);
-    xmlParts.push(`        <TYPE>${y.type === 'ale' ? 'Ale' : y.type === 'lager' ? 'Lager' : 'Wheat'}</TYPE>`);
-    xmlParts.push(`        <FORM>${y.form === 'dry' ? 'Dry' : 'Liquid'}</FORM>`);
-    xmlParts.push(`        <ATTENUATION>${y.attenuation || 75}</ATTENUATION>`);
-    xmlParts.push('      </YEAST>');
-  });
-  xmlParts.push('    </YEASTS>');
+  if (recipe.ingredients.miscellaneous && recipe.ingredients.miscellaneous.length > 0) {
+    xmlParts.push('    <MISCELLANEOUS>');
+    recipe.ingredients.miscellaneous.forEach(m => {
+      xmlParts.push('      <MISC>');
+      xmlParts.push(`        <NAME>${sanitize(m.name)}</NAME>`);
+      xmlParts.push(`        <AMOUNT>${m.amount.value / 1000}</AMOUNT>`);
+      xmlParts.push(`        <TYPE>${sanitize(m.type)}</TYPE>`);
+      xmlParts.push(`        <USE>${sanitize(m.use)}</USE>`);
+      xmlParts.push(`        <TIME>${m.time.value}</TIME>`);
+      xmlParts.push('      </MISC>');
+    });
+    xmlParts.push('    </MISCELLANEOUS>');
+  }
 
   xmlParts.push('  </RECIPE>');
   xmlParts.push('</RECIPES>');
@@ -91,56 +74,26 @@ export const exportToBeerXml = (recipe: Recipe): string => {
 export const exportLibraryToBeerXml = (ingredients: LibraryIngredient[]): string => {
   const xmlParts: string[] = [];
   xmlParts.push('<?xml version="1.0" encoding="UTF-8"?>');
-  
-  // We wrap everything in a root tag, or separate sections
   xmlParts.push('<BREW_LIBRARY>');
   
-  // Fermentables section
-  const fermentables = ingredients.filter(i => i.type === 'fermentable');
-  if (fermentables.length > 0) {
-    xmlParts.push('  <FERMENTABLES>');
-    fermentables.forEach(f => {
-      xmlParts.push('    <FERMENTABLE>');
-      xmlParts.push(`      <NAME>${sanitize(f.name)}</NAME>`);
-      xmlParts.push('      <VERSION>1</VERSION>');
-      xmlParts.push(`      <TYPE>Grain</TYPE>`);
-      xmlParts.push(`      <YIELD>${f.yield || 75}</YIELD>`);
-      xmlParts.push(`      <COLOR>${f.color || 0}</COLOR>`);
-      xmlParts.push('    </FERMENTABLE>');
-    });
-    xmlParts.push('  </FERMENTABLES>');
-  }
+  ingredients.filter(i => i.type === 'misc').forEach(m => {
+    xmlParts.push('  <MISC>');
+    xmlParts.push(`    <NAME>${sanitize(m.name)}</NAME>`);
+    xmlParts.push(`    <TYPE>${sanitize(m.misc_type || "Other")}</TYPE>`);
+    xmlParts.push(`    <USE>${sanitize(m.misc_use || "Boil")}</USE>`);
+    xmlParts.push('  </MISC>');
+  });
 
-  // Hops section
-  const hops = ingredients.filter(i => i.type === 'hop');
-  if (hops.length > 0) {
-    xmlParts.push('  <HOPS>');
-    hops.forEach(h => {
-      xmlParts.push('    <HOP>');
-      xmlParts.push(`      <NAME>${sanitize(h.name)}</NAME>`);
-      xmlParts.push('      <VERSION>1</VERSION>');
-      xmlParts.push(`      <ALPHA>${h.alpha || 0}</ALPHA>`);
-      xmlParts.push('      <USE>Boil</USE>');
-      xmlParts.push('    </HOP>');
-    });
-    xmlParts.push('  </HOPS>');
-  }
-
-  // Yeasts section
-  const yeasts = ingredients.filter(i => i.type === 'culture');
-  if (yeasts.length > 0) {
-    xmlParts.push('  <YEASTS>');
-    yeasts.forEach(y => {
-      xmlParts.push('    <YEAST>');
-      xmlParts.push(`      <NAME>${sanitize(y.name)}</NAME>`);
-      xmlParts.push('      <VERSION>1</VERSION>');
-      xmlParts.push(`      <TYPE>Ale</TYPE>`);
-      xmlParts.push(`      <FORM>${y.form === 'liquid' ? 'Liquid' : 'Dry'}</FORM>`);
-      xmlParts.push(`      <ATTENUATION>${y.attenuation || 75}</ATTENUATION>`);
-      xmlParts.push('    </YEAST>');
-    });
-    xmlParts.push('  </YEASTS>');
-  }
+  ingredients.filter(i => i.type === 'style').forEach(s => {
+    xmlParts.push('  <STYLE>');
+    xmlParts.push(`    <NAME>${sanitize(s.name)}</NAME>`);
+    xmlParts.push(`    <CATEGORY>${sanitize(s.category || "")}</CATEGORY>`);
+    xmlParts.push(`    <OG_MIN>${s.og_min || 0}</OG_MIN>`);
+    xmlParts.push(`    <OG_MAX>${s.og_max || 0}</OG_MAX>`);
+    xmlParts.push(`    <IBU_MIN>${s.ibu_min || 0}</IBU_MIN>`);
+    xmlParts.push(`    <IBU_MAX>${s.ibu_max || 0}</IBU_MAX>`);
+    xmlParts.push('  </STYLE>');
+  });
 
   xmlParts.push('</BREW_LIBRARY>');
   return xmlParts.join('\n');
