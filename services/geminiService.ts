@@ -9,7 +9,7 @@ export class GeminiService {
     // Initializing right before API call ensures we use the correct environment API_KEY.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-2.0-flash",
       contents: `Generate a detailed beer recipe in BeerJSON structure based on the following request: ${prompt}. 
       
       CRITICAL INSTRUCTIONS:
@@ -137,7 +137,7 @@ export class GeminiService {
     // Initializing right before API call ensures we use the correct environment API_KEY.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: `As a Master Cicerone, analyze this recipe and the following tasting notes:
       
       Recipe: ${JSON.stringify(recipe)}
