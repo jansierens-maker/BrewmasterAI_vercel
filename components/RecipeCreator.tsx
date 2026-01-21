@@ -35,6 +35,7 @@ const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, onDelete, initial
   });
 
   const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const [aiPrompt, setAiPrompt] = useState('');
   const gemini = new GeminiService();
 
@@ -169,7 +170,7 @@ const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, onDelete, initial
   };
 
   const handleAiGenerate = async () => {
-    if (!aiPrompt.trim()) return;
+    if (!aiPrompt.trim() || cooldown > 0) return;
     setLoading(true);
     try {
       const generated = await gemini.generateRecipe(aiPrompt);
@@ -179,6 +180,16 @@ const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, onDelete, initial
           id: recipe.id // Keep existing ID if editing
         });
         setAiPrompt('');
+        setCooldown(30); // 30 second cooldown
+        const timer = window.setInterval(() => {
+          setCooldown(prev => {
+            if (prev <= 1) {
+              window.clearInterval(timer);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
       }
     } catch (error: any) {
       console.error("AI Generation failed:", error);
@@ -206,11 +217,11 @@ const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, onDelete, initial
           />
           <button
             onClick={handleAiGenerate}
-            disabled={loading || !aiPrompt.trim()}
+            disabled={loading || !aiPrompt.trim() || cooldown > 0}
             className="bg-amber-600 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-lg hover:bg-amber-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
           >
-            {loading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-magic"></i>}
-            {loading ? 'Thinking...' : 'Generate'}
+            {loading ? <i className="fas fa-spinner fa-spin"></i> : (cooldown > 0 ? <i className="fas fa-clock"></i> : <i className="fas fa-magic"></i>)}
+            {loading ? 'Thinking...' : (cooldown > 0 ? `Wait ${cooldown}s` : 'Generate')}
           </button>
         </div>
       </section>

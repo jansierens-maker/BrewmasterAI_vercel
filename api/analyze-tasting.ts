@@ -1,5 +1,6 @@
 
 import { GoogleGenAI } from "@google/genai";
+import { isRateLimited } from "./utils/rateLimit";
 
 export const config = {
   maxDuration: 60,
@@ -8,6 +9,17 @@ export const config = {
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // Basic IP-based rate limiting
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'anonymous';
+  const rateLimit = isRateLimited(Array.isArray(ip) ? ip[0] : ip);
+
+  if (rateLimit.limited) {
+    return res.status(429).json({
+      error: 'Rate limit exceeded. Please try again later.',
+      reset: rateLimit.reset
+    });
   }
 
   const { recipe, notes } = req.body;
