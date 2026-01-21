@@ -180,9 +180,9 @@ const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, onDelete, initial
         });
         setAiPrompt('');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("AI Generation failed:", error);
-      alert("Failed to generate recipe. Please check your API key and try again.");
+      alert(error.message || "Failed to generate recipe. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }

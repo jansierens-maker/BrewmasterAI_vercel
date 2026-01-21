@@ -17,7 +17,9 @@ export default async function handler(req: any, res: any) {
 
   const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY is not configured' });
+    const isDev = process.env.NODE_ENV === 'development' || !process.env.VERCEL_ENV;
+    const hint = isDev ? ' (Did you set it in .env.local and run via vercel dev?)' : ' (Check Vercel Environment Variables)';
+    return res.status(500).json({ error: `GEMINI_API_KEY is not configured${hint}` });
   }
 
   try {

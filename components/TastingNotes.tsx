@@ -52,8 +52,9 @@ const TastingNotes: React.FC<TastingNotesProps> = ({ recipe, brewLogId, onSave }
     try {
       const feedback = await gemini.analyzeTasting(recipe, note.comments);
       setAiFeedback(feedback);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      alert(error.message || "Failed to analyze tasting notes.");
     } finally {
       setAnalyzing(false);
     }
