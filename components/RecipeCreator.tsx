@@ -35,6 +35,8 @@ const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, onDelete, initial
   });
 
   const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [aiPrompt, setAiPrompt] = useState('');
   const gemini = new GeminiService();
 
   const stats = useMemo(() => calculateRecipeStats(recipe), [recipe]);
@@ -167,8 +169,63 @@ const RecipeCreator: React.FC<RecipeCreatorProps> = ({ onSave, onDelete, initial
     });
   };
 
+  const handleAiGenerate = async () => {
+    if (!aiPrompt.trim() || cooldown > 0) return;
+    setLoading(true);
+    try {
+      const generated = await gemini.generateRecipe(aiPrompt);
+      if (generated && generated.name) {
+        setRecipe({
+          ...generated,
+          id: recipe.id // Keep existing ID if editing
+        });
+        setAiPrompt('');
+        setCooldown(30); // 30 second cooldown
+        const timer = window.setInterval(() => {
+          setCooldown(prev => {
+            if (prev <= 1) {
+              window.clearInterval(timer);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      }
+    } catch (error: any) {
+      console.error("AI Generation failed:", error);
+      alert(error.message || "Failed to generate recipe. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {/* AI Generation Section */}
+      <section className="bg-amber-50 p-6 rounded-3xl border border-amber-200 shadow-sm space-y-4">
+        <div className="flex items-center gap-3 text-amber-900 mb-2">
+          <div className="bg-amber-500 p-2 rounded-lg text-white"><i className="fas fa-brain"></i></div>
+          <h3 className="text-lg font-black uppercase tracking-tight">Generate with BrewAI</h3>
+        </div>
+        <div className="flex gap-3">
+          <input
+            className="flex-1 p-4 bg-white border border-amber-200 rounded-2xl text-sm font-medium shadow-inner"
+            placeholder="Describe the beer you want to brew (e.g., 'A hazy IPA with Citra and Mosaic, 6.5% ABV')..."
+            value={aiPrompt}
+            onChange={e => setAiPrompt(e.target.value)}
+            disabled={loading}
+          />
+          <button
+            onClick={handleAiGenerate}
+            disabled={loading || !aiPrompt.trim() || cooldown > 0}
+            className="bg-amber-600 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-lg hover:bg-amber-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+          >
+            {loading ? <i className="fas fa-spinner fa-spin"></i> : (cooldown > 0 ? <i className="fas fa-clock"></i> : <i className="fas fa-magic"></i>)}
+            {loading ? 'Thinking...' : (cooldown > 0 ? `Wait ${cooldown}s` : 'Generate')}
+          </button>
+        </div>
+      </section>
+
       {/* Target Stats Section */}
       <section className="bg-stone-900 text-white p-8 rounded-3xl shadow-xl grid grid-cols-2 lg:grid-cols-4 gap-8 sticky top-24 z-40 border border-stone-800">
         <div>

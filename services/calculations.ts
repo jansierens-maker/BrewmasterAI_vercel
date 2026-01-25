@@ -75,7 +75,11 @@ export const calculateRecipeStats = (recipe: Recipe, alphaOverrides?: Record<str
   recipe.ingredients.fermentables.forEach(f => {
     if (!f.amount) return;
     const unit = normalizeUnit(f.amount.unit);
-    const weightKg = unit === 'kilograms' ? f.amount.value : f.amount.value * 0.453592;
+    let weightKg = f.amount.value;
+    if (unit === 'pounds') weightKg = f.amount.value * 0.453592;
+    else if (unit === 'grams') weightKg = f.amount.value / 1000;
+    else if (unit === 'ounces') weightKg = f.amount.value * 0.0283495;
+
     // Fallback to 1.037 if potential is missing
     const potential = f.yield?.potential?.value || 1.037;
     const ppg = (potential - 1) * 1000;
@@ -97,7 +101,11 @@ export const calculateRecipeStats = (recipe: Recipe, alphaOverrides?: Record<str
   recipe.ingredients.fermentables.forEach(f => {
     if (!f.amount) return;
     const unit = normalizeUnit(f.amount.unit);
-    const weightLbs = unit === 'pounds' ? f.amount.value : f.amount.value * 2.20462;
+    let weightLbs = f.amount.value;
+    if (unit === 'kilograms') weightLbs = f.amount.value * 2.20462;
+    else if (unit === 'grams') weightLbs = f.amount.value * 0.00220462;
+    else if (unit === 'ounces') weightLbs = f.amount.value / 16;
+
     const colorSRM = f.color?.value || 2;
     const volumeGal = batchSizeL / 3.78541;
     mcu += (weightLbs * colorSRM) / (volumeGal || 1);
@@ -110,7 +118,11 @@ export const calculateRecipeStats = (recipe: Recipe, alphaOverrides?: Record<str
     if (h.use === 'boil' || h.use === 'first_wort' || h.use === 'whirlpool') {
       const alpha = alphaOverrides?.[h.name] !== undefined ? alphaOverrides[h.name] : (h.alpha_acid?.value || 5);
       const unit = normalizeUnit(h.amount.unit);
-      const weightG = unit === 'grams' ? h.amount.value : h.amount.value * 28.3495;
+      let weightG = h.amount.value;
+      if (unit === 'ounces') weightG = h.amount.value * 28.3495;
+      else if (unit === 'kilograms') weightG = h.amount.value * 1000;
+      else if (unit === 'pounds') weightG = h.amount.value * 453.592;
+
       const time = h.time.value;
       
       // Tinseth Utilization Formula

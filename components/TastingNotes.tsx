@@ -44,16 +44,28 @@ const TastingNotes: React.FC<TastingNotesProps> = ({ recipe, brewLogId, onSave }
 
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const gemini = new GeminiService();
 
   const handleAnalyze = async () => {
-    if (!note.comments) return;
+    if (!note.comments || cooldown > 0) return;
     setAnalyzing(true);
     try {
       const feedback = await gemini.analyzeTasting(recipe, note.comments);
       setAiFeedback(feedback);
-    } catch (error) {
+      setCooldown(30);
+      const timer = window.setInterval(() => {
+        setCooldown(prev => {
+          if (prev <= 1) {
+            window.clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (error: any) {
       console.error(error);
+      alert(error.message || "Failed to analyze tasting notes.");
     } finally {
       setAnalyzing(false);
     }
@@ -82,11 +94,11 @@ const TastingNotes: React.FC<TastingNotesProps> = ({ recipe, brewLogId, onSave }
             />
             <button 
               onClick={handleAnalyze}
-              disabled={analyzing || !note.comments}
-              className="w-full bg-amber-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2"
+              disabled={analyzing || !note.comments || cooldown > 0}
+              className="w-full bg-amber-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
             >
-              {analyzing ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-brain"></i>}
-              {t('analyze_ai')}
+              {analyzing ? <i className="fas fa-spinner fa-spin"></i> : (cooldown > 0 ? <i className="fas fa-clock"></i> : <i className="fas fa-brain"></i>)}
+              {analyzing ? '...' : (cooldown > 0 ? `Wait ${cooldown}s` : t('analyze_ai'))}
             </button>
           </div>
         </div>
